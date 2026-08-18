@@ -75,12 +75,7 @@ class HermesAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(
                         CONF_SYSTEM_PROMPT,
                         default=defaults[CONF_SYSTEM_PROMPT],
-                    ): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            type=selector.TextSelectorType.TEXT,
-                            multiline=True,
-                        )
-                    ),
+                    ): selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
                 }
             ),
             errors=errors,
