@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, intent
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import intent
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import (
@@ -21,28 +23,28 @@ from .const import (
     CONF_API_PORT,
     CONF_API_TOKEN,
     CONF_API_URL,
-    CONF_MODEL,
-    CONF_HANDOFF_MODEL,
-    CONF_HANDOFF_TIMEOUT,
     CONF_COMPLETION_ANNOUNCE_ENTITY,
     CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
     CONF_COMPLETION_TTS_ENTITY,
     CONF_COMPLETION_TTS_LANGUAGE,
     CONF_COMPLETION_TTS_VOICE,
+    CONF_HANDOFF_MODEL,
+    CONF_HANDOFF_TIMEOUT,
+    CONF_MODEL,
     CONF_SYSTEM_PROMPT,
     CONF_TIMEOUT,
     CONF_VOICE_WAIT_TIMEOUT,
     DEFAULT_API_HOST,
     DEFAULT_API_PORT,
-    DEFAULT_MODEL,
-    DEFAULT_HANDOFF_MODEL,
-    DEFAULT_HANDOFF_SPEECH,
-    DEFAULT_HANDOFF_TIMEOUT,
     DEFAULT_COMPLETION_ANNOUNCE_ENTITY,
     DEFAULT_COMPLETION_MEDIA_PLAYER_ENTITY,
     DEFAULT_COMPLETION_TTS_ENTITY,
     DEFAULT_COMPLETION_TTS_LANGUAGE,
     DEFAULT_COMPLETION_TTS_VOICE,
+    DEFAULT_HANDOFF_MODEL,
+    DEFAULT_HANDOFF_SPEECH,
+    DEFAULT_HANDOFF_TIMEOUT,
+    DEFAULT_MODEL,
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_TIMEOUT,
     DEFAULT_VOICE_WAIT_TIMEOUT,
@@ -58,6 +60,8 @@ _LONG_RESULT_TRIGGER_CHARS = 650
 _FULL_REPORT_LOCATION = "Home Assistant notifications"
 _RUN_POLL_INTERVAL = 1.0
 _RUN_BACKGROUND_TIMEOUT = 300
+_PENDING_FOLLOWUP_TTL_SECONDS = 300
+_SHORT_REPLY_MAX_WORDS = 8
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
@@ -85,6 +89,7 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
         self.entry = entry
+        self._pending_followups: dict[str, dict[str, Any]] = {}
         data = entry.data
         api_url = _entry_api_url(data)
         self._voice_wait_timeout = float(
@@ -142,20 +147,33 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
         """Return supported languages."""
         return "*"
 
-    async def async_process(self, user_input: conversation.ConversationInput) -> conversation.ConversationResult:
+    async def async_process(
+        self,
+        user_input: conversation.ConversationInput,
+    ) -> conversation.ConversationResult:
         """Process a sentence through Hermes."""
         conversation_id = getattr(user_input, "conversation_id", None)
         language = getattr(user_input, "language", None)
+        device_id = getattr(user_input, "device_id", None)
         device_name = self._device_name(user_input)
+        pending_followup = self._consume_pending_followup(user_input)
+        request_text = (
+            _followup_reply_prompt(user_input.text, pending_followup)
+            if pending_followup
+            else user_input.text
+        )
+        hermes_conversation_id = (
+            pending_followup.get("conversation_id") if pending_followup else conversation_id
+        )
         try:
             run = await self._client.async_start_run(
-                user_input.text,
-                conversation_id=conversation_id,
+                request_text,
+                conversation_id=hermes_conversation_id,
                 language=language,
                 device_name=device_name,
             )
             handoff_task = self._start_handoff_task(
-                user_input.text,
+                request_text,
                 language=language,
                 device_name=device_name,
             )
@@ -169,7 +187,12 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 speech = _UNAVAILABLE_SPEECH
             else:
                 self.hass.async_create_task(
-                    self._notify_when_run_finishes(run.run_id, user_input.text)
+                    self._notify_when_run_finishes(
+                        run.run_id,
+                        request_text,
+                        conversation_id=hermes_conversation_id,
+                        device_id=device_id,
+                    )
                 )
                 speech = await self._resolve_handoff_speech(handoff_task)
         except HermesAssistError as exc:
@@ -185,6 +208,64 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             response=intent_response,
             conversation_id=conversation_id,
         )
+
+    def _consume_pending_followup(
+        self,
+        user_input: conversation.ConversationInput,
+    ) -> dict[str, Any] | None:
+        """Return pending follow-up context for a short reply, if one applies."""
+        text = getattr(user_input, "text", "") or ""
+        if not _is_short_elliptical_reply(text):
+            self._prune_expired_followups()
+            return None
+        keys = _followup_keys(
+            getattr(user_input, "device_id", None),
+            getattr(user_input, "conversation_id", None),
+        )
+        now = time.monotonic()
+        for key in keys:
+            pending = self._pending_followups.get(key)
+            if not pending:
+                continue
+            if pending.get("expires_at", 0) < now:
+                self._pending_followups.pop(key, None)
+                continue
+            # Remove every alias for this pending item so one reply cannot be
+            # applied twice if HA reuses both device and conversation metadata.
+            pending_id = pending.get("id")
+            for stored_key, stored in list(self._pending_followups.items()):
+                if stored.get("id") == pending_id:
+                    self._pending_followups.pop(stored_key, None)
+            return pending
+        self._prune_expired_followups()
+        return None
+
+    def _store_pending_followup(
+        self,
+        *,
+        request_text: str,
+        followup_message: str,
+        conversation_id: str | None,
+        device_id: str | None,
+    ) -> None:
+        """Cache context so the next short satellite reply keeps continuity."""
+        pending_id = f"{time.monotonic():.6f}"
+        pending = {
+            "id": pending_id,
+            "request_text": request_text,
+            "followup_message": followup_message,
+            "conversation_id": conversation_id,
+            "device_id": device_id,
+            "expires_at": time.monotonic() + _PENDING_FOLLOWUP_TTL_SECONDS,
+        }
+        for key in _followup_keys(device_id, conversation_id):
+            self._pending_followups[key] = dict(pending)
+
+    def _prune_expired_followups(self) -> None:
+        now = time.monotonic()
+        for key, pending in list(self._pending_followups.items()):
+            if pending.get("expires_at", 0) < now:
+                self._pending_followups.pop(key, None)
 
     def _start_handoff_task(
         self,
@@ -254,7 +335,14 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             await asyncio.sleep(min(_RUN_POLL_INTERVAL, max(0, deadline - self.hass.loop.time())))
         return None
 
-    async def _notify_when_run_finishes(self, run_id: str, request_text: str) -> None:
+    async def _notify_when_run_finishes(
+        self,
+        run_id: str,
+        request_text: str,
+        *,
+        conversation_id: str | None,
+        device_id: str | None,
+    ) -> None:
         """Create a Home Assistant notification when a background Hermes run completes."""
         deadline = self.hass.loop.time() + _RUN_BACKGROUND_TIMEOUT
         while self.hass.loop.time() < deadline:
@@ -267,32 +355,57 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 await self._deliver_background_result(
                     "Hermes finished working",
                     status.output or f"Hermes completed: {request_text}",
+                    request_text=request_text,
+                    conversation_id=conversation_id,
+                    device_id=device_id,
                 )
                 return
             if status.status == "waiting_for_approval":
                 await self._deliver_background_result(
                     "Hermes needs approval",
                     f"Hermes needs approval to continue: {request_text}",
+                    request_text=request_text,
+                    conversation_id=conversation_id,
+                    device_id=device_id,
                 )
                 return
             if status.status in {"failed", "cancelled"}:
                 await self._deliver_background_result(
                     "Hermes run did not complete",
                     status.output or f"Hermes run {status.status}: {request_text}",
+                    request_text=request_text,
+                    conversation_id=conversation_id,
+                    device_id=device_id,
                 )
                 return
             await asyncio.sleep(_RUN_POLL_INTERVAL)
         await self._deliver_background_result(
             "Hermes is still working",
             f"Hermes is still working on: {request_text}",
+            request_text=request_text,
+            conversation_id=conversation_id,
+            device_id=device_id,
         )
 
-    async def _deliver_background_result(self, title: str, message: str) -> None:
+    async def _deliver_background_result(
+        self,
+        title: str,
+        message: str,
+        *,
+        request_text: str = "",
+        conversation_id: str | None = None,
+        device_id: str | None = None,
+    ) -> None:
         """Deliver a completed background run to notification and optional tablet."""
         await self._create_notification(title, message)
         tablet_message = _background_tablet_message(title, message)
         if await self._start_followup_conversation_if_needed(tablet_message):
-            await self._speak_to_tablet(_followup_message(tablet_message))
+            self._store_pending_followup(
+                request_text=request_text,
+                followup_message=_followup_message(tablet_message),
+                conversation_id=conversation_id,
+                device_id=device_id,
+            )
             return
         await self._announce_to_tablet(tablet_message)
         await self._speak_to_tablet(tablet_message)
@@ -481,6 +594,72 @@ def _looks_like_followup_question(message: str) -> bool:
         "want to",
     )
     return any(marker in lowered for marker in followup_markers)
+
+
+def _is_short_elliptical_reply(text: str) -> bool:
+    """Return true for replies that need previous-question context."""
+    clean = " ".join((text or "").strip().lower().strip(".?!").split())
+    if not clean:
+        return False
+    if len(clean.split()) > _SHORT_REPLY_MAX_WORDS:
+        return False
+    confirmation_markers = (
+        "yes",
+        "yes please",
+        "yeah",
+        "yep",
+        "please do",
+        "do it",
+        "go ahead",
+        "sure",
+        "ok",
+        "okay",
+        "no",
+        "no thanks",
+        "not now",
+        "cancel",
+        "don't",
+        "dont",
+        "leave it",
+        "turn it off",
+        "turn it on",
+    )
+    if clean in confirmation_markers:
+        return True
+    return clean.startswith(("yes ", "yeah ", "yep ", "no ", "ok ", "okay "))
+
+
+def _followup_keys(device_id: str | None, conversation_id: str | None) -> list[str]:
+    """Return lookup keys from most specific to broad fallback."""
+    keys: list[str] = []
+    if device_id:
+        keys.append(f"device:{device_id}")
+    if conversation_id:
+        keys.append(f"conversation:{conversation_id}")
+    keys.append("global")
+    return keys
+
+
+def _followup_reply_prompt(reply: str, pending: dict[str, Any] | None) -> str:
+    """Build a Hermes input that preserves the previous spoken question."""
+    if not pending:
+        return reply
+    lines = [
+        "Home Assistant Assist follow-up reply.",
+        "The user is replying to a previous spoken follow-up question.",
+    ]
+    request_text = str(pending.get("request_text") or "").strip()
+    followup_message = str(pending.get("followup_message") or "").strip()
+    if request_text:
+        lines.append(f"Previous user request: {request_text}")
+    if followup_message:
+        lines.append(f"Previous Hermes follow-up question: {followup_message}")
+    lines.append(f"User reply: {reply}")
+    lines.append(
+        "Interpret short confirmations or denials in the context of the previous question. "
+        "If confirmed, perform the implied action; if denied, acknowledge briefly."
+    )
+    return "\n".join(lines)
 
 
 def _followup_message(message: str) -> str:

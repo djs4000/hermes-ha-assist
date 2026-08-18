@@ -95,7 +95,11 @@ def test_completion_tablet_delivery_is_configurable():
     assert 'full_message = f"{title}. {message}".strip()' not in conversation_source
     assert "I saved the full report" in conversation_source
     assert "_looks_like_followup_question" in conversation_source
-    assert "await self._speak_to_tablet(_followup_message(tablet_message))" in conversation_source
+    assert "_store_pending_followup" in conversation_source
+    assert "_consume_pending_followup" in conversation_source
+    assert "_followup_reply_prompt" in conversation_source
+    duplicate_followup_tts = "await self._speak_to_tablet(_followup_message(tablet_message))"
+    assert duplicate_followup_tts not in conversation_source
     assert '"tts"' in conversation_source
     assert '"speak"' in conversation_source
     assert "media_player_entity_id" in conversation_source
@@ -113,3 +117,21 @@ def test_conversation_uses_runs_with_handoff_and_background_completion():
     assert "async_create_task" in source
     assert "Let me check on that" in const_source
     assert "persistent_notification" in source
+
+
+def test_followup_context_helpers_detect_short_replies():
+    source = CONVERSATION.read_text()
+
+    assert "def _is_short_elliptical_reply" in source
+    assert '"yes please"' in source
+    assert '"not now"' in source
+    assert "_SHORT_REPLY_MAX_WORDS" in source
+
+
+def test_followup_delivery_uses_single_speech_path():
+    source = CONVERSATION.read_text()
+
+    assert "assist_satellite" in source
+    assert "start_conversation" in source
+    assert "return\n        await self._announce_to_tablet(tablet_message)" in source
+    assert "start_conversation" in source and "_store_pending_followup" in source
