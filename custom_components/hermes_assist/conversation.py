@@ -440,9 +440,9 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 device_id=device_id,
             )
             return
-        if await self._speak_to_tablet(tablet_message):
+        if await self._announce_to_tablet(tablet_message):
             return
-        await self._announce_to_tablet(tablet_message)
+        await self._speak_to_tablet(tablet_message)
 
     async def _start_followup_conversation_if_needed(self, message: str) -> bool:
         """Start an Assist satellite conversation when the result asks a follow-up."""

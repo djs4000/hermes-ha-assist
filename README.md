@@ -16,8 +16,9 @@ The previous WebSocket spike proved the concept, but request/response voice turn
 - graceful AI-generated spoken fallback when Hermes is still working, generated in parallel with the main run and with a static fallback if generation fails
 - short tablet/TTS summaries for long background results, with the full report saved in a durable notification
 - optional tablet/satellite completion delivery using one speech path at a time:
-  `tts.speak` for ordinary background answers, with `assist_satellite.announce`
-  as a fallback; follow-up questions use `assist_satellite.start_conversation`
+  `assist_satellite.announce` for ordinary completed answers and
+  `assist_satellite.start_conversation` for follow-up questions; plain
+  `tts.speak` is only a fallback if announce fails or is not configured
 - automatic `assist_satellite.start_conversation` for background results that end with an actionable follow-up question
 - stable conversation/session headers so Hermes can keep context
 
@@ -92,7 +93,7 @@ Assist turns use Hermes `/v1/runs`:
 3. If the run completes quickly, Assist speaks the answer.
 4. As soon as the run starts, the integration also starts the configured handoff model in parallel. If Hermes is still working after the voice wait, Assist uses the contextual handoff if it is already ready, otherwise it immediately uses the static phrase.
 5. The run continues in the background and the integration creates a Home Assistant persistent notification containing the full result when it completes, fails, needs approval, or is still running after the background polling window.
-6. If completion TTS entities are configured, ordinary short results are spoken with `tts.speak`. If no TTS path is configured, the satellite `assist_satellite.announce` path is used as a fallback.
+6. If a completion satellite entity is configured, ordinary short results use `assist_satellite.announce` for kiosk visual/preannounce feedback and speech in one path. Plain `tts.speak` is used only as a fallback if announce fails or no completion satellite is configured.
 7. For long results, such as health checks or research reports, the tablet gets a short summary plus `I saved the full report in Home Assistant notifications.` The full text stays in the notification.
 8. If the background result ends with an actionable follow-up question, such as `Want me to repair the automations first?`, the integration uses `assist_satellite.start_conversation` on the configured satellite with the short summary and question, so the user can answer naturally.
 
