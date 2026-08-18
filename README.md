@@ -2,17 +2,18 @@
 
 A clean Home Assistant custom integration that exposes Hermes Agent as a Home Assistant Assist conversation agent using Hermes' existing HTTP API.
 
-This intentionally does **not** use a persistent WebSocket for voice requests. Home Assistant sends each spoken/text query as an independent HTTP request to Hermes' OpenAI-compatible API and receives a single speech response.
+This intentionally does **not** use a persistent WebSocket for voice requests. Home Assistant starts each spoken/text query as a Hermes HTTP run, waits briefly for a fast answer, and hands longer work off to the background instead of letting Assist fail silently.
 
 ## Why
 
 The previous WebSocket spike proved the concept, but request/response voice turns do not need a long-lived connection. This integration is designed to be simpler and more reliable:
 
 - no persistent WebSocket reconnect state
-- bounded HTTP request timeout below HA's voice timeout
-- graceful spoken fallback when Hermes is slow/unavailable
+- `/v1/runs` for Assist turns so long-running work can continue after the spoken response
+- configurable short voice wait before handoff, default `10` seconds
+- graceful spoken fallback when Hermes is still working
+- Home Assistant notification when a background Hermes run finishes
 - stable conversation/session headers so Hermes can keep context
-- no new Hermes-side code required
 
 ## Requirements
 
@@ -20,16 +21,17 @@ The previous WebSocket spike proved the concept, but request/response voice turn
 - Hermes Agent API server enabled and reachable from Home Assistant
 - Hermes `API_SERVER_KEY` bearer token
 
-Hermes' documented local API endpoint is inferred from the URL and port you enter:
+Hermes' documented local API endpoints are inferred from the URL and port you enter:
 
 ```text
 http://<hermes-host>:<api-port>/v1/chat/completions
+http://<hermes-host>:<api-port>/v1/runs
 ```
 
 Example for a Hermes host at `192.168.1.148` using the default API port:
 
 ```text
-http://192.168.1.148:8642/v1/chat/completions
+http://192.168.1.148:8642/v1/runs
 ```
 
 ## Install manually
@@ -48,20 +50,34 @@ Restart Home Assistant, then add the integration from **Settings → Devices & s
 - **Hermes API port**: Usually `8642`.
 - **Hermes API token**: Hermes `API_SERVER_KEY` bearer token.
 - **Hermes API model ID**: Usually `hermes-agent`. This is the OpenAI-compatible model identifier Hermes exposes, not necessarily the underlying LLM provider/model.
-- **Request timeout seconds**: Default `24`, below Home Assistant's typical 30-second Assist timeout.
+- **Request timeout seconds**: Default `24`; this bounds individual HTTP calls to Hermes.
+- **Voice wait timeout seconds**: Default `10`; Assist waits this long for a run to finish before saying it will continue in the background.
 - **System prompt**: Optional prompt used for Home Assistant Assist responses.
 
 After setup, open the integration's **Configure** / **Options** dialog to edit:
 
 - **Hermes API model ID**
 - **Request timeout seconds**
+- **Voice wait timeout seconds**
 - **System prompt**
 
 Connection-critical values — Hermes URL, API port, and API token — stay in the original setup entry.
 
+## Long-running voice behavior
+
+Assist turns use Hermes `/v1/runs`:
+
+1. Home Assistant starts a Hermes run.
+2. The integration polls for up to **Voice wait timeout seconds**.
+3. If the run completes quickly, Assist speaks the answer.
+4. If Hermes is still working, Assist says: `Let me work on that. I’ll send the result as a Home Assistant notification when it’s done.`
+5. The run continues in the background and the integration creates a Home Assistant persistent notification when it completes, fails, needs approval, or is still running after the background polling window.
+
+This is intended for requests like health checks, diagnostics, searches, and other multi-step work that take longer than a comfortable voice response window.
+
 ## Legacy entries
 
-Older config entries that stored a full `api_url` continue to work. New setup forms use the cleaner Hermes URL + API port fields and infer `/v1/chat/completions` automatically.
+Older config entries that stored a full `api_url` continue to work. New setup forms use the cleaner Hermes URL + API port fields and infer `/v1/chat/completions` plus `/v1/runs` automatically.
 
 ## Development
 

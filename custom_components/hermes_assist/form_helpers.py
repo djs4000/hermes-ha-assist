@@ -8,12 +8,14 @@ CONF_API_TOKEN = "api_token"
 CONF_MODEL = "model"
 CONF_SYSTEM_PROMPT = "system_prompt"
 CONF_TIMEOUT = "timeout"
+CONF_VOICE_WAIT_TIMEOUT = "voice_wait_timeout"
 
 DEFAULT_API_HOST = "http://127.0.0.1"
 DEFAULT_API_PORT = 8642
 DEFAULT_API_URL = "http://127.0.0.1:8642/v1/chat/completions"
 DEFAULT_MODEL = "hermes-agent"
 DEFAULT_TIMEOUT = 24
+DEFAULT_VOICE_WAIT_TIMEOUT = 10
 DEFAULT_SYSTEM_PROMPT = (
     "You are Hermes, responding through Home Assistant Assist. "
     "Reply naturally and concisely for text-to-speech. "
@@ -35,5 +37,8 @@ def config_flow_form_defaults(user_input: dict | None) -> dict:
         CONF_API_URL: user_input.get(CONF_API_URL, DEFAULT_API_URL),
         CONF_MODEL: user_input.get(CONF_MODEL, DEFAULT_MODEL),
         CONF_TIMEOUT: user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT),
+        CONF_VOICE_WAIT_TIMEOUT: user_input.get(
+            CONF_VOICE_WAIT_TIMEOUT, DEFAULT_VOICE_WAIT_TIMEOUT
+        ),
         CONF_SYSTEM_PROMPT: user_input.get(CONF_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT),
     }

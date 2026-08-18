@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -29,6 +28,24 @@ class HermesAssistResponse:
     raw: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class HermesRunStart:
+    run_id: str
+    raw: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class HermesRunStatus:
+    run_id: str
+    status: str
+    output: str
+    raw: dict[str, Any]
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in {"completed", "failed", "cancelled"}
+
+
 def normalize_chat_completions_url(api_url: str) -> str:
     """Accept a Hermes host/base/v1 URL and return /v1/chat/completions."""
     url = (api_url or "").strip().rstrip("/")
@@ -39,6 +56,15 @@ def normalize_chat_completions_url(api_url: str) -> str:
     if url.endswith("/v1"):
         return f"{url}/chat/completions"
     return urljoin(f"{url}/", "v1/chat/completions")
+
+
+def normalize_runs_url(api_url: str) -> str:
+    """Accept a Hermes host/base/chat URL and return /v1/runs."""
+    chat_url = normalize_chat_completions_url(api_url)
+    suffix = "/v1/chat/completions"
+    if not chat_url.endswith(suffix):
+        raise ValueError("Hermes chat completions URL must end with /v1/chat/completions")
+    return f"{chat_url[: -len(suffix)]}/v1/runs"
 
 
 def build_chat_completions_url(api_host: str, api_port: int | str) -> str:
@@ -69,7 +95,7 @@ def build_chat_completions_url(api_host: str, api_port: int | str) -> str:
 
 
 class HermesAssistClient:
-    """Small async client for Hermes' OpenAI-compatible chat completions API."""
+    """Small async client for Hermes' OpenAI-compatible API."""
 
     def __init__(
         self,
@@ -83,6 +109,7 @@ class HermesAssistClient:
     ) -> None:
         self._session = session
         self.api_url = normalize_chat_completions_url(api_url)
+        self.runs_url = normalize_runs_url(self.api_url)
         self._api_token = api_token
         self._model = model
         self._timeout = aiohttp.ClientTimeout(total=float(timeout))
@@ -104,15 +131,7 @@ class HermesAssistClient:
         language: str | None,
         device_name: str | None = None,
     ) -> HermesAssistResponse:
-        headers = {
-            "Authorization": f"Bearer {self._api_token}",
-            "Content-Type": "application/json",
-        }
-        session_key = _session_key(conversation_id)
-        if session_key:
-            headers["X-Hermes-Session-Key"] = session_key
-            headers["X-Hermes-Session-Id"] = session_key
-
+        headers = self._headers(conversation_id)
         user_message = _format_user_message(text, language=language, device_name=device_name)
         payload: dict[str, Any] = {
             "model": self._model,
@@ -123,35 +142,99 @@ class HermesAssistClient:
             ],
         }
 
-        try:
-            async with self._session.post(
-                self.api_url,
-                headers=headers,
-                json=payload,
-                timeout=self._timeout,
-            ) as response:
-                raw_text = await response.text()
-                if response.status in {401, 403}:
-                    raise HermesAuthError("Hermes API rejected the configured token")
-                if response.status >= 400:
-                    raise HermesAssistError(
-                        f"Hermes API returned HTTP {response.status}: {raw_text[:500]}"
-                    )
-                try:
-                    data = await response.json()
-                except Exception as exc:  # pragma: no cover - defensive
-                    raise HermesAssistError("Hermes API returned non-JSON response") from exc
-        except TimeoutError as exc:
-            raise HermesTimeoutError("Hermes did not respond before the voice deadline") from exc
-        except asyncio.TimeoutError as exc:
-            raise HermesTimeoutError("Hermes did not respond before the voice deadline") from exc
-        except aiohttp.ClientError as exc:
-            raise HermesAssistError(f"Could not connect to Hermes API: {exc}") from exc
-
+        data = await self._post_json(self.api_url, headers=headers, payload=payload)
         speech = extract_speech(data)
         if not speech:
             raise HermesAssistError("Hermes returned an empty response")
         return HermesAssistResponse(speech=speech, raw=data)
+
+    async def async_start_run(
+        self,
+        text: str,
+        *,
+        conversation_id: str | None,
+        language: str | None,
+        device_name: str | None = None,
+    ) -> HermesRunStart:
+        """Start a long-running Hermes run and return its run id."""
+        headers = self._headers(conversation_id)
+        session_key = _session_key(conversation_id)
+        user_message = _format_user_message(text, language=language, device_name=device_name)
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "input": user_message,
+            "instructions": self._system_prompt,
+        }
+        if session_key:
+            payload["session_id"] = session_key
+
+        data = await self._post_json(self.runs_url, headers=headers, payload=payload)
+        run_id = str(data.get("run_id") or "")
+        if not run_id:
+            raise HermesAssistError("Hermes run response did not include a run_id")
+        return HermesRunStart(run_id=run_id, raw=data)
+
+    async def async_get_run(self, run_id: str) -> HermesRunStatus:
+        """Return the current status for a Hermes run."""
+        data = await self._get_json(f"{self.runs_url}/{run_id}", headers=self._headers(None))
+        status = str(data.get("status") or "")
+        output = str(data.get("output") or data.get("error") or "")
+        return HermesRunStatus(run_id=run_id, status=status, output=output, raw=data)
+
+    async def _post_json(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str],
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        try:
+            async with self._session.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=self._timeout,
+            ) as response:
+                return await _json_or_error(response)
+        except TimeoutError as exc:
+            raise HermesTimeoutError("Hermes did not respond before the voice deadline") from exc
+        except aiohttp.ClientError as exc:
+            raise HermesAssistError(f"Could not connect to Hermes API: {exc}") from exc
+
+    async def _get_json(self, url: str, *, headers: dict[str, str]) -> dict[str, Any]:
+        try:
+            async with self._session.get(url, headers=headers, timeout=self._timeout) as response:
+                return await _json_or_error(response)
+        except TimeoutError as exc:
+            raise HermesTimeoutError("Hermes did not respond before the voice deadline") from exc
+        except aiohttp.ClientError as exc:
+            raise HermesAssistError(f"Could not connect to Hermes API: {exc}") from exc
+
+    def _headers(self, conversation_id: str | None) -> dict[str, str]:
+        headers = {
+            "Authorization": f"Bearer {self._api_token}",
+            "Content-Type": "application/json",
+        }
+        session_key = _session_key(conversation_id)
+        if session_key:
+            headers["X-Hermes-Session-Key"] = session_key
+            headers["X-Hermes-Session-Id"] = session_key
+        return headers
+
+
+async def _json_or_error(response: aiohttp.ClientResponse) -> dict[str, Any]:
+    raw_text = await response.text()
+    if response.status in {401, 403}:
+        raise HermesAuthError("Hermes API rejected the configured token")
+    if response.status >= 400:
+        raise HermesAssistError(f"Hermes API returned HTTP {response.status}: {raw_text[:500]}")
+    try:
+        data = await response.json()
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HermesAssistError("Hermes API returned non-JSON response") from exc
+    if not isinstance(data, dict):
+        raise HermesAssistError("Hermes API returned unexpected JSON")
+    return data
 
 
 def extract_speech(data: dict[str, Any]) -> str:

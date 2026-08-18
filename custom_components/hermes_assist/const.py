@@ -8,12 +8,14 @@ CONF_API_URL = "api_url"
 CONF_API_TOKEN = "api_token"
 CONF_MODEL = "model"
 CONF_TIMEOUT = "timeout"
+CONF_VOICE_WAIT_TIMEOUT = "voice_wait_timeout"
 CONF_SYSTEM_PROMPT = "system_prompt"
 
 DEFAULT_API_HOST = "http://127.0.0.1"
 DEFAULT_API_PORT = 8642
 DEFAULT_MODEL = "hermes-agent"
 DEFAULT_TIMEOUT = 24
+DEFAULT_VOICE_WAIT_TIMEOUT = 10
 DEFAULT_SYSTEM_PROMPT = (
     "You are Hermes, responding through Home Assistant Assist. "
     "Reply naturally and concisely for text-to-speech. "

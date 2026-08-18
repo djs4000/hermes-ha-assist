@@ -19,9 +19,11 @@ from .const import (
     CONF_MODEL,
     CONF_SYSTEM_PROMPT,
     CONF_TIMEOUT,
+    CONF_VOICE_WAIT_TIMEOUT,
     DEFAULT_MODEL,
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_TIMEOUT,
+    DEFAULT_VOICE_WAIT_TIMEOUT,
     DOMAIN,
 )
 
@@ -80,6 +82,10 @@ class HermesAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_MODEL, default=defaults[CONF_MODEL]): str,
                     vol.Optional(CONF_TIMEOUT, default=defaults[CONF_TIMEOUT]): vol.Coerce(int),
                     vol.Optional(
+                        CONF_VOICE_WAIT_TIMEOUT,
+                        default=defaults[CONF_VOICE_WAIT_TIMEOUT],
+                    ): vol.Coerce(int),
+                    vol.Optional(
                         CONF_SYSTEM_PROMPT,
                         default=defaults[CONF_SYSTEM_PROMPT],
                     ): selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
@@ -110,6 +116,10 @@ class HermesAssistOptionsFlowHandler(config_entries.OptionsFlow):
         )
         model = options.get(CONF_MODEL, data.get(CONF_MODEL, DEFAULT_MODEL))
         timeout = options.get(CONF_TIMEOUT, data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+        voice_wait_timeout = options.get(
+            CONF_VOICE_WAIT_TIMEOUT,
+            data.get(CONF_VOICE_WAIT_TIMEOUT, DEFAULT_VOICE_WAIT_TIMEOUT),
+        )
 
         return self.async_show_form(
             step_id="init",
@@ -117,6 +127,7 @@ class HermesAssistOptionsFlowHandler(config_entries.OptionsFlow):
                 {
                     vol.Optional(CONF_MODEL, default=model): str,
                     vol.Optional(CONF_TIMEOUT, default=timeout): vol.Coerce(int),
+                    vol.Optional(CONF_VOICE_WAIT_TIMEOUT, default=voice_wait_timeout): vol.Coerce(int),
                     vol.Optional(
                         CONF_SYSTEM_PROMPT,
                         default=prompt,
