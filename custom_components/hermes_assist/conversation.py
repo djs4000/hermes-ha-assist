@@ -6,7 +6,7 @@ from typing import Any
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, intent
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import (
@@ -102,7 +102,7 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             _LOGGER.exception("Unexpected Hermes voice request failure")
             speech = _UNAVAILABLE_SPEECH
 
-        intent_response = conversation.IntentResponse(language=language or "en")
+        intent_response = intent.IntentResponse(language=language or "en")
         intent_response.async_set_speech(speech)
         return conversation.ConversationResult(
             response=intent_response,
