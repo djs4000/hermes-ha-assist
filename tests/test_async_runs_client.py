@@ -91,6 +91,8 @@ def test_completion_tablet_delivery_is_configurable():
     assert '"announce"' in conversation_source
     assert '"start_conversation"' in conversation_source
     assert "_background_tablet_message" in conversation_source
+    assert 'parts = [f"{title}. {summary}"]' not in conversation_source
+    assert 'full_message = f"{title}. {message}".strip()' not in conversation_source
     assert "I saved the full report" in conversation_source
     assert "_looks_like_followup_question" in conversation_source
     assert "await self._speak_to_tablet(_followup_message(tablet_message))" in conversation_source

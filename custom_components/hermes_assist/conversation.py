@@ -394,7 +394,7 @@ def _cancel_task(task: asyncio.Task[Any] | None) -> None:
 def _background_tablet_message(title: str, message: str) -> str:
     """Return a concise tablet/TTS message while preserving the full notification."""
     clean_message = _normalize_message(message)
-    full_message = _tablet_message(title, clean_message)
+    full_message = _tablet_message(clean_message)
     if len(clean_message) <= _LONG_RESULT_TRIGGER_CHARS and _line_count(clean_message) <= 8:
         return full_message
 
@@ -403,7 +403,7 @@ def _background_tablet_message(title: str, message: str) -> str:
     if followup_question:
         summary_source = clean_message[: -len(followup_question)].rstrip()
     summary = _short_summary(summary_source)
-    parts = [f"{title}. {summary}"]
+    parts = [summary]
     parts.append(f"I saved the full report in {_FULL_REPORT_LOCATION}.")
     if followup_question:
         parts.append(followup_question)
@@ -491,9 +491,9 @@ def _followup_message(message: str) -> str:
     return f"{text[: _FOLLOWUP_QUESTION_MAX_CHARS - 1].rstrip()}…"
 
 
-def _tablet_message(title: str, message: str) -> str:
+def _tablet_message(message: str) -> str:
     """Return a tablet-friendly message that is safe to display and speak."""
-    full_message = f"{title}. {message}".strip()
+    full_message = (message or "").strip()
     if len(full_message) <= _TABLET_MESSAGE_MAX_CHARS:
         return full_message
     return f"{full_message[: _TABLET_MESSAGE_MAX_CHARS - 1].rstrip()}…"
