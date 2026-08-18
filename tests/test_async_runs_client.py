@@ -133,17 +133,18 @@ def test_followup_delivery_uses_single_speech_path():
 
     assert "assist_satellite" in source
     assert "start_conversation" in source
-    assert "if await self._announce_to_tablet(tablet_message):" in source
-    assert "return\n        await self._speak_to_tablet(tablet_message)" in source
+    assert "if await self._speak_to_tablet(tablet_message):" in source
+    assert "return\n        await self._announce_to_tablet(tablet_message)" in source
     assert "start_conversation" in source and "_store_pending_followup" in source
 
 
-def test_background_completion_uses_satellite_or_tts_not_both():
+def test_background_completion_prefers_tts_then_satellite_fallback():
     source = CONVERSATION.read_text()
 
-    assert "if await self._announce_to_tablet(tablet_message):" in source
-    assert "return\n        await self._speak_to_tablet(tablet_message)" in source
+    assert "if await self._speak_to_tablet(tablet_message):" in source
+    assert "return\n        await self._announce_to_tablet(tablet_message)" in source
     assert "async def _announce_to_tablet(self, message: str) -> bool" in source
+    assert "async def _speak_to_tablet(self, message: str) -> bool" in source
 
 
 def test_immediate_followup_questions_keep_satellite_conversation_open():

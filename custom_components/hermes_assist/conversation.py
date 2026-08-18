@@ -440,9 +440,9 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 device_id=device_id,
             )
             return
-        if await self._announce_to_tablet(tablet_message):
+        if await self._speak_to_tablet(tablet_message):
             return
-        await self._speak_to_tablet(tablet_message)
+        await self._announce_to_tablet(tablet_message)
 
     async def _start_followup_conversation_if_needed(self, message: str) -> bool:
         """Start an Assist satellite conversation when the result asks a follow-up."""
@@ -483,9 +483,9 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             )
             return False
 
-    async def _speak_to_tablet(self, message: str) -> None:
+    async def _speak_to_tablet(self, message: str) -> bool:
         if not self._completion_tts_entity or not self._completion_media_player_entity:
-            return
+            return False
         try:
             service_data = {
                 "media_player_entity_id": self._completion_media_player_entity,
@@ -503,12 +503,14 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 target={"entity_id": self._completion_tts_entity},
                 blocking=False,
             )
+            return True
         except Exception:
             _LOGGER.exception(
                 "Could not speak Hermes completion via %s to %s",
                 self._completion_tts_entity,
                 self._completion_media_player_entity,
             )
+            return False
 
     async def _create_notification(self, title: str, message: str) -> None:
         await self.hass.services.async_call(
