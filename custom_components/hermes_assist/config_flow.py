@@ -7,19 +7,17 @@ import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
+from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import HermesAssistClient, HermesAssistError
+from .form_helpers import config_flow_form_defaults
 from .const import (
     CONF_API_TOKEN,
     CONF_API_URL,
     CONF_MODEL,
     CONF_SYSTEM_PROMPT,
     CONF_TIMEOUT,
-    DEFAULT_API_URL,
-    DEFAULT_MODEL,
-    DEFAULT_SYSTEM_PROMPT,
-    DEFAULT_TIMEOUT,
     DOMAIN,
 )
 
@@ -61,16 +59,28 @@ class HermesAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data=user_input,
                 )
 
+        defaults = config_flow_form_defaults(user_input)
+
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(CONF_NAME, default="Hermes Assist"): str,
-                    vol.Required(CONF_API_URL, default=DEFAULT_API_URL): str,
-                    vol.Required(CONF_API_TOKEN): str,
-                    vol.Optional(CONF_MODEL, default=DEFAULT_MODEL): str,
-                    vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(int),
-                    vol.Optional(CONF_SYSTEM_PROMPT, default=DEFAULT_SYSTEM_PROMPT): str,
+                    vol.Optional(CONF_NAME, default=defaults[CONF_NAME]): str,
+                    vol.Required(CONF_API_URL, default=defaults[CONF_API_URL]): str,
+                    vol.Required(CONF_API_TOKEN): selector.TextSelector(
+                        selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                    ),
+                    vol.Optional(CONF_MODEL, default=defaults[CONF_MODEL]): str,
+                    vol.Optional(CONF_TIMEOUT, default=defaults[CONF_TIMEOUT]): vol.Coerce(int),
+                    vol.Optional(
+                        CONF_SYSTEM_PROMPT,
+                        default=defaults[CONF_SYSTEM_PROMPT],
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.TEXT,
+                            multiline=True,
+                        )
+                    ),
                 }
             ),
             errors=errors,
