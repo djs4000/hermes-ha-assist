@@ -77,6 +77,7 @@ def test_completion_tablet_delivery_is_configurable():
     assert "_background_tablet_message" in conversation_source
     assert "I saved the full report" in conversation_source
     assert "_looks_like_followup_question" in conversation_source
+    assert "await self._speak_to_tablet(_followup_message(tablet_message))" in conversation_source
     assert '"tts"' in conversation_source
     assert '"speak"' in conversation_source
     assert "media_player_entity_id" in conversation_source

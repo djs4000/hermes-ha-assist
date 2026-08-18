@@ -280,6 +280,7 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
         await self._create_notification(title, message)
         tablet_message = _background_tablet_message(title, message)
         if await self._start_followup_conversation_if_needed(tablet_message):
+            await self._speak_to_tablet(_followup_message(tablet_message))
             return
         await self._announce_to_tablet(tablet_message)
         await self._speak_to_tablet(tablet_message)
