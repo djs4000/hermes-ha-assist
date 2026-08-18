@@ -180,7 +180,15 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             status = await self._wait_for_run(run.run_id, self._voice_wait_timeout)
             if status and status.status == "completed" and status.output:
                 _cancel_task(handoff_task)
-                speech = status.output
+                if await self._start_immediate_followup_conversation_if_needed(
+                    status.output,
+                    request_text=request_text,
+                    conversation_id=hermes_conversation_id,
+                    device_id=device_id,
+                ):
+                    speech = ""
+                else:
+                    speech = status.output
             elif status and status.status == "failed":
                 _cancel_task(handoff_task)
                 _LOGGER.warning("Hermes run failed before voice handoff: %s", status.output)
@@ -266,6 +274,31 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
         for key, pending in list(self._pending_followups.items()):
             if pending.get("expires_at", 0) < now:
                 self._pending_followups.pop(key, None)
+
+    async def _start_immediate_followup_conversation_if_needed(
+        self,
+        message: str,
+        *,
+        request_text: str,
+        conversation_id: str | None,
+        device_id: str | None,
+    ) -> bool:
+        """Open a satellite reply window for immediate follow-up questions.
+
+        Returning a follow-up as normal conversation speech makes the satellite
+        ask and then stop listening. Starting a satellite conversation speaks the
+        question through one path and keeps the microphone open for the answer.
+        """
+        followup_message = _followup_message(message)
+        if not await self._start_followup_conversation_if_needed(followup_message):
+            return False
+        self._store_pending_followup(
+            request_text=request_text,
+            followup_message=followup_message,
+            conversation_id=conversation_id,
+            device_id=device_id,
+        )
+        return True
 
     def _start_handoff_task(
         self,

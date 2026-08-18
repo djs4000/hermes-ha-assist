@@ -135,3 +135,12 @@ def test_followup_delivery_uses_single_speech_path():
     assert "start_conversation" in source
     assert "return\n        await self._announce_to_tablet(tablet_message)" in source
     assert "start_conversation" in source and "_store_pending_followup" in source
+
+
+def test_immediate_followup_questions_keep_satellite_conversation_open():
+    source = CONVERSATION.read_text()
+
+    assert "_start_immediate_followup_conversation_if_needed" in source
+    assert "Returning a follow-up as normal conversation speech" in source
+    assert "speech = \"\"" in source
+    assert "keeps the microphone open for the answer" in source
