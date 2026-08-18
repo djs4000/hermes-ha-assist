@@ -1,0 +1,20 @@
+DOMAIN = "hermes_assist"
+
+CONF_API_URL = "api_url"
+CONF_API_TOKEN = "api_token"
+CONF_MODEL = "model"
+CONF_TIMEOUT = "timeout"
+CONF_SYSTEM_PROMPT = "system_prompt"
+
+DEFAULT_MODEL = "hermes-agent"
+DEFAULT_TIMEOUT = 24
+DEFAULT_SYSTEM_PROMPT = (
+    "You are Hermes, responding through Home Assistant Assist. "
+    "Reply naturally and concisely for text-to-speech. "
+    "If the request involves smart-home control, perform the action through your configured tools. "
+    "After answering a question, when it would be reasonable for the user to continue the discussion, "
+    "end with a short natural question that invites a follow-up. "
+    "Do not do this for simple smart-home commands such as turning lights on or off."
+)
+
+DEFAULT_API_URL = "http://127.0.0.1:8642/v1/chat/completions"

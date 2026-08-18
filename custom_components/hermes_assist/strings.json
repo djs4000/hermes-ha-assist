@@ -1,0 +1,26 @@
+{
+  "title": "Hermes Assist",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect Hermes Assist",
+        "description": "Connect Home Assistant Assist to Hermes Agent using Hermes HTTP API.",
+        "data": {
+          "name": "Name",
+          "api_url": "Hermes API URL",
+          "api_token": "Hermes API token",
+          "model": "Model",
+          "timeout": "Request timeout seconds",
+          "system_prompt": "System prompt"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to Hermes or validate the token.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "Hermes Assist is already configured."
+    }
+  }
+}
