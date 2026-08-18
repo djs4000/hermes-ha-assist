@@ -4,7 +4,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import aiohttp
 
@@ -39,6 +39,33 @@ def normalize_chat_completions_url(api_url: str) -> str:
     if url.endswith("/v1"):
         return f"{url}/chat/completions"
     return urljoin(f"{url}/", "v1/chat/completions")
+
+
+def build_chat_completions_url(api_host: str, api_port: int | str) -> str:
+    """Build the documented Hermes chat completions endpoint from host + port."""
+    host = (api_host or "").strip().rstrip("/")
+    if not host:
+        raise ValueError("Hermes URL is required")
+    port = str(api_port).strip()
+    if not port:
+        raise ValueError("Hermes API port is required")
+
+    parts = urlsplit(host)
+    if not parts.scheme or not parts.netloc:
+        raise ValueError("Hermes URL must include http:// or https://")
+
+    hostname = parts.hostname or parts.netloc
+    if ":" in hostname and not hostname.startswith("["):
+        hostname = f"[{hostname}]"
+    netloc = hostname
+    if parts.username:
+        auth = parts.username
+        if parts.password:
+            auth = f"{auth}:{parts.password}"
+        netloc = f"{auth}@{netloc}"
+    netloc = f"{netloc}:{port}"
+    base = urlunsplit((parts.scheme, netloc, parts.path.rstrip("/"), "", ""))
+    return normalize_chat_completions_url(base)
 
 
 class HermesAssistClient:

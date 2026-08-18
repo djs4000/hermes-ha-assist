@@ -18,12 +18,18 @@ The previous WebSocket spike proved the concept, but request/response voice turn
 
 - Home Assistant with custom integrations enabled
 - Hermes Agent API server enabled and reachable from Home Assistant
-- Hermes `API_SERVER_KEY` or equivalent bearer token
+- Hermes `API_SERVER_KEY` bearer token
 
-Hermes default API URL is usually:
+Hermes' documented local API endpoint is inferred from the URL and port you enter:
 
 ```text
-http://<hermes-host>:8642/v1/chat/completions
+http://<hermes-host>:<api-port>/v1/chat/completions
+```
+
+Example for a Hermes host at `192.168.1.148` using the default API port:
+
+```text
+http://192.168.1.148:8642/v1/chat/completions
 ```
 
 ## Install manually
@@ -38,23 +44,32 @@ Restart Home Assistant, then add the integration from **Settings → Devices & s
 
 ## Configuration fields
 
-- **Hermes API URL**: Base URL or full chat-completions URL. Examples:
-  - `http://192.168.1.148:8642`
-  - `http://192.168.1.148:8642/v1`
-  - `http://192.168.1.148:8642/v1/chat/completions`
-- **API token**: Hermes API bearer token.
-- **Model**: usually `hermes-agent`.
-- **Request timeout**: default 24 seconds, below Home Assistant's typical 30s Assist timeout.
+- **Hermes URL**: The base Hermes host URL, without the API path. Example: `http://192.168.1.148`.
+- **Hermes API port**: Usually `8642`.
+- **Hermes API token**: Hermes `API_SERVER_KEY` bearer token.
+- **Hermes API model ID**: Usually `hermes-agent`. This is the OpenAI-compatible model identifier Hermes exposes, not necessarily the underlying LLM provider/model.
+- **Request timeout seconds**: Default `24`, below Home Assistant's typical 30-second Assist timeout.
+- **System prompt**: Optional prompt used for Home Assistant Assist responses.
 
-After setup, open the integration's **Configure** / **Options** dialog to edit the optional **System prompt**. It is kept out of the initial connection form so connection errors do not make a large prompt field awkward to manage.
+After setup, open the integration's **Configure** / **Options** dialog to edit:
+
+- **Hermes API model ID**
+- **Request timeout seconds**
+- **System prompt**
+
+Connection-critical values — Hermes URL, API port, and API token — stay in the original setup entry.
+
+## Legacy entries
+
+Older config entries that stored a full `api_url` continue to work. New setup forms use the cleaner Hermes URL + API port fields and infer `/v1/chat/completions` automatically.
 
 ## Development
 
 ```bash
-uv run --with pytest --with pytest-asyncio python -m pytest -q
+uv run --with pytest --with aiohttp python -m pytest -q
 python3 -m compileall custom_components tests
 ```
 
 ## Status
 
-Initial clean scaffold. The client and config flow are implemented; HA runtime validation should be tested inside Home Assistant before release.
+Clean HTTP-based Home Assistant Assist integration for Hermes Agent. Runtime validation should still be performed inside Home Assistant after updating custom component files.

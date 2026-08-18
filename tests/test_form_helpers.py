@@ -13,7 +13,8 @@ _SPEC.loader.exec_module(form_helpers)
 def test_form_defaults_preserve_non_secret_values_after_validation_error():
     user_input = {
         "name": "Hermes Assist Dev",
-        "api_url": "http://192.168.1.148:8642",
+        "api_host": "http://192.168.1.148",
+        "api_port": 8642,
         "api_token": "super-secret-token",
         "model": "hermes-agent",
         "timeout": 18,
@@ -23,19 +24,20 @@ def test_form_defaults_preserve_non_secret_values_after_validation_error():
     defaults = form_helpers.config_flow_form_defaults(user_input)
 
     assert defaults["name"] == "Hermes Assist Dev"
-    assert defaults["api_url"] == "http://192.168.1.148:8642"
+    assert defaults["api_host"] == "http://192.168.1.148"
+    assert defaults["api_port"] == 8642
     assert defaults["model"] == "hermes-agent"
     assert defaults["timeout"] == 18
+    assert defaults["system_prompt"] == "A long custom prompt\nwith multiple lines."
     assert "api_token" not in defaults
-    assert "system_prompt" not in defaults
 
 
 def test_form_defaults_use_initial_values_without_user_input():
     defaults = form_helpers.config_flow_form_defaults(None)
 
     assert defaults["name"] == "Hermes Assist"
-    assert defaults["api_url"] == "http://127.0.0.1:8642/v1/chat/completions"
+    assert defaults["api_host"] == "http://127.0.0.1"
+    assert defaults["api_port"] == 8642
     assert defaults["model"] == "hermes-agent"
     assert defaults["timeout"] == 24
     assert "api_token" not in defaults
-    assert "system_prompt" not in defaults

@@ -1,11 +1,17 @@
 DOMAIN = "hermes_assist"
 
+# New setup fields. Keep CONF_API_URL as a legacy storage key for entries created
+# before host/port were split.
+CONF_API_HOST = "api_host"
+CONF_API_PORT = "api_port"
 CONF_API_URL = "api_url"
 CONF_API_TOKEN = "api_token"
 CONF_MODEL = "model"
 CONF_TIMEOUT = "timeout"
 CONF_SYSTEM_PROMPT = "system_prompt"
 
+DEFAULT_API_HOST = "http://127.0.0.1"
+DEFAULT_API_PORT = 8642
 DEFAULT_MODEL = "hermes-agent"
 DEFAULT_TIMEOUT = 24
 DEFAULT_SYSTEM_PROMPT = (
@@ -17,4 +23,4 @@ DEFAULT_SYSTEM_PROMPT = (
     "Do not do this for simple smart-home commands such as turning lights on or off."
 )
 
-DEFAULT_API_URL = "http://127.0.0.1:8642/v1/chat/completions"
+DEFAULT_API_URL = f"{DEFAULT_API_HOST}:{DEFAULT_API_PORT}/v1/chat/completions"

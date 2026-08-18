@@ -4,13 +4,15 @@
     "step": {
       "user": {
         "title": "Connect Hermes Assist",
-        "description": "Connect Home Assistant Assist to Hermes Agent using Hermes HTTP API.",
+        "description": "Connect Home Assistant Assist to Hermes Agent using the documented Hermes HTTP API. The integration builds /v1/chat/completions automatically.",
         "data": {
           "name": "Name",
-          "api_url": "Hermes API URL",
+          "api_host": "Hermes URL",
+          "api_port": "Hermes API port",
           "api_token": "Hermes API token",
-          "model": "Model",
-          "timeout": "Request timeout seconds"
+          "model": "Hermes API model ID",
+          "timeout": "Request timeout seconds",
+          "system_prompt": "System prompt"
         }
       }
     },
@@ -26,8 +28,10 @@
     "step": {
       "init": {
         "title": "Hermes Assist options",
-        "description": "Configure optional Hermes Assist behavior.",
+        "description": "Tune Hermes Assist behavior. Connection URL and token remain in the original setup entry; the API model ID, timeout, and system prompt can be adjusted here.",
         "data": {
+          "model": "Hermes API model ID",
+          "timeout": "Request timeout seconds",
           "system_prompt": "System prompt"
         }
       }
