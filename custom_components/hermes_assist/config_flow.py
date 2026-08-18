@@ -82,14 +82,11 @@ class HermesAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     def async_get_options_flow(config_entry: config_entries.ConfigEntry):
         """Return the options flow for Hermes Assist."""
-        return HermesAssistOptionsFlowHandler(config_entry)
+        return HermesAssistOptionsFlowHandler()
 
 
 class HermesAssistOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle Hermes Assist options."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Manage Hermes Assist options."""
