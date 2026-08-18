@@ -49,6 +49,7 @@ _LOGGER = logging.getLogger(__name__)
 _HANDOFF_SPEECH = DEFAULT_HANDOFF_SPEECH
 _UNAVAILABLE_SPEECH = "I’m sorry, Hermes is not available right now."
 _TABLET_MESSAGE_MAX_CHARS = 900
+_FOLLOWUP_QUESTION_MAX_CHARS = 500
 _RUN_POLL_INTERVAL = 1.0
 _RUN_BACKGROUND_TIMEOUT = 300
 
@@ -243,8 +244,30 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
         """Deliver a completed background run to notification and optional tablet."""
         await self._create_notification(title, message)
         tablet_message = _tablet_message(title, message)
+        if await self._start_followup_conversation_if_needed(tablet_message):
+            return
         await self._announce_to_tablet(tablet_message)
         await self._speak_to_tablet(tablet_message)
+
+    async def _start_followup_conversation_if_needed(self, message: str) -> bool:
+        """Start an Assist satellite conversation when the result asks a follow-up."""
+        if not self._completion_announce_entity or not _looks_like_followup_question(message):
+            return False
+        try:
+            await self.hass.services.async_call(
+                "assist_satellite",
+                "start_conversation",
+                {"start_message": _followup_message(message)},
+                target={"entity_id": self._completion_announce_entity},
+                blocking=False,
+            )
+            return True
+        except Exception:
+            _LOGGER.exception(
+                "Could not start Hermes follow-up conversation on %s",
+                self._completion_announce_entity,
+            )
+            return False
 
     async def _announce_to_tablet(self, message: str) -> None:
         if not self._completion_announce_entity:
@@ -307,6 +330,33 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             return device.name if device else None
         except Exception:
             return None
+
+
+def _looks_like_followup_question(message: str) -> bool:
+    """Return true when a background result appears to invite a spoken reply."""
+    text = (message or "").strip()
+    if not text.endswith("?"):
+        return False
+    lowered = text.lower()
+    followup_markers = (
+        "want me to",
+        "would you like me to",
+        "should i",
+        "shall i",
+        "do you want me to",
+        "would you like",
+        "should we",
+        "want to",
+    )
+    return any(marker in lowered for marker in followup_markers)
+
+
+def _followup_message(message: str) -> str:
+    """Return a concise start-conversation prompt for the satellite."""
+    text = " ".join((message or "").strip().split())
+    if len(text) <= _FOLLOWUP_QUESTION_MAX_CHARS:
+        return text
+    return f"{text[: _FOLLOWUP_QUESTION_MAX_CHARS - 1].rstrip()}…"
 
 
 def _tablet_message(title: str, message: str) -> str:

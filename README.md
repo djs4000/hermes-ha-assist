@@ -14,6 +14,7 @@ The previous WebSocket spike proved the concept, but request/response voice turn
 - graceful AI-generated spoken fallback when Hermes is still working, with a static fallback if generation fails
 - Home Assistant notification when a background Hermes run finishes
 - optional tablet/satellite completion announcement using `assist_satellite.announce` plus `tts.speak`
+- automatic `assist_satellite.start_conversation` for background results that end with an actionable follow-up question
 - stable conversation/session headers so Hermes can keep context
 
 ## Requirements
@@ -84,6 +85,7 @@ Assist turns use Hermes `/v1/runs`:
 4. If Hermes is still working, Assist asks the configured handoff model for a short contextual phrase such as `Let me check on that. I’ll send the result when it’s done.` If generation fails or is too slow, the static phrase is used.
 5. The run continues in the background and the integration creates a Home Assistant persistent notification when it completes, fails, needs approval, or is still running after the background polling window.
 6. If completion tablet entities are configured, the same background result is also displayed with `assist_satellite.announce` and spoken through `tts.speak`.
+7. If the background result ends with an actionable follow-up question, such as `Want me to repair the automations first?`, the integration uses `assist_satellite.start_conversation` on the configured satellite instead of a passive announce/TTS pair, so the user can answer naturally.
 
 This is intended for requests like health checks, diagnostics, searches, and other multi-step work that take longer than a comfortable voice response window.
 

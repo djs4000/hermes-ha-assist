@@ -69,6 +69,8 @@ def test_completion_tablet_delivery_is_configurable():
     assert "Completion Assist satellite entity" in strings_source
     assert '"assist_satellite"' in conversation_source
     assert '"announce"' in conversation_source
+    assert '"start_conversation"' in conversation_source
+    assert "_looks_like_followup_question" in conversation_source
     assert '"tts"' in conversation_source
     assert '"speak"' in conversation_source
     assert "media_player_entity_id" in conversation_source
