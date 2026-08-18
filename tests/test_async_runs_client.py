@@ -70,6 +70,8 @@ def test_completion_tablet_delivery_is_configurable():
     assert '"assist_satellite"' in conversation_source
     assert '"announce"' in conversation_source
     assert '"start_conversation"' in conversation_source
+    assert "_background_tablet_message" in conversation_source
+    assert "I saved the full report" in conversation_source
     assert "_looks_like_followup_question" in conversation_source
     assert '"tts"' in conversation_source
     assert '"speak"' in conversation_source

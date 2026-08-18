@@ -48,8 +48,10 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 _HANDOFF_SPEECH = DEFAULT_HANDOFF_SPEECH
 _UNAVAILABLE_SPEECH = "I’m sorry, Hermes is not available right now."
-_TABLET_MESSAGE_MAX_CHARS = 900
-_FOLLOWUP_QUESTION_MAX_CHARS = 500
+_TABLET_MESSAGE_MAX_CHARS = 420
+_FOLLOWUP_QUESTION_MAX_CHARS = 320
+_LONG_RESULT_TRIGGER_CHARS = 650
+_FULL_REPORT_LOCATION = "Home Assistant notifications"
 _RUN_POLL_INTERVAL = 1.0
 _RUN_BACKGROUND_TIMEOUT = 300
 
@@ -243,7 +245,7 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
     async def _deliver_background_result(self, title: str, message: str) -> None:
         """Deliver a completed background run to notification and optional tablet."""
         await self._create_notification(title, message)
-        tablet_message = _tablet_message(title, message)
+        tablet_message = _background_tablet_message(title, message)
         if await self._start_followup_conversation_if_needed(tablet_message):
             return
         await self._announce_to_tablet(tablet_message)
@@ -330,6 +332,79 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             return device.name if device else None
         except Exception:
             return None
+
+
+def _background_tablet_message(title: str, message: str) -> str:
+    """Return a concise tablet/TTS message while preserving the full notification."""
+    clean_message = _normalize_message(message)
+    full_message = _tablet_message(title, clean_message)
+    if len(clean_message) <= _LONG_RESULT_TRIGGER_CHARS and _line_count(clean_message) <= 8:
+        return full_message
+
+    followup_question = _extract_followup_question(clean_message)
+    summary_source = clean_message
+    if followup_question:
+        summary_source = clean_message[: -len(followup_question)].rstrip()
+    summary = _short_summary(summary_source)
+    parts = [f"{title}. {summary}"]
+    parts.append(f"I saved the full report in {_FULL_REPORT_LOCATION}.")
+    if followup_question:
+        parts.append(followup_question)
+    return _trim_message(" ".join(part for part in parts if part))
+
+
+def _short_summary(message: str) -> str:
+    """Extract a short operational summary from a longer result."""
+    lines = [
+        line.strip(" -*•\t")
+        for line in _normalize_message(message).splitlines()
+        if line.strip(" -*•\t")
+    ]
+    useful_lines = [
+        line
+        for line in lines
+        if not line.lower().startswith(("home assistant health check", "summary", "details"))
+    ] or lines
+    if not useful_lines:
+        return "I finished the check."
+    summary = "; ".join(useful_lines[:2])
+    if len(summary) > 220:
+        summary = f"{summary[:219].rstrip()}…"
+    if not summary.endswith((".", "!", "?", "…")):
+        summary += "."
+    return summary
+
+
+def _extract_followup_question(message: str) -> str:
+    """Extract a trailing actionable follow-up question, if present."""
+    text = _normalize_message(message)
+    if not _looks_like_followup_question(text):
+        return ""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    for line in reversed(lines):
+        if _looks_like_followup_question(line):
+            return line
+    markers = ["Want me to", "Would you like me to", "Should I", "Shall I", "Do you want me to"]
+    for marker in markers:
+        index = text.rfind(marker)
+        if index >= 0:
+            return text[index:].strip()
+    return text
+
+
+def _normalize_message(message: str) -> str:
+    return "\n".join(line.rstrip() for line in (message or "").strip().splitlines())
+
+
+def _line_count(message: str) -> int:
+    return sum(1 for line in (message or "").splitlines() if line.strip())
+
+
+def _trim_message(message: str, max_chars: int = _TABLET_MESSAGE_MAX_CHARS) -> str:
+    text = " ".join((message or "").strip().split())
+    if len(text) <= max_chars:
+        return text
+    return f"{text[: max_chars - 1].rstrip()}…"
 
 
 def _looks_like_followup_question(message: str) -> bool:

@@ -12,7 +12,7 @@ The previous WebSocket spike proved the concept, but request/response voice turn
 - `/v1/runs` for Assist turns so long-running work can continue after the spoken response
 - configurable short voice wait before handoff, default `10` seconds
 - graceful AI-generated spoken fallback when Hermes is still working, with a static fallback if generation fails
-- Home Assistant notification when a background Hermes run finishes
+- short tablet/TTS summaries for long background results, with the full report saved in a durable notification
 - optional tablet/satellite completion announcement using `assist_satellite.announce` plus `tts.speak`
 - automatic `assist_satellite.start_conversation` for background results that end with an actionable follow-up question
 - stable conversation/session headers so Hermes can keep context
@@ -83,9 +83,10 @@ Assist turns use Hermes `/v1/runs`:
 2. The integration polls for up to **Voice wait timeout seconds**.
 3. If the run completes quickly, Assist speaks the answer.
 4. If Hermes is still working, Assist asks the configured handoff model for a short contextual phrase such as `Let me check on that. I’ll send the result when it’s done.` If generation fails or is too slow, the static phrase is used.
-5. The run continues in the background and the integration creates a Home Assistant persistent notification when it completes, fails, needs approval, or is still running after the background polling window.
-6. If completion tablet entities are configured, the same background result is also displayed with `assist_satellite.announce` and spoken through `tts.speak`.
-7. If the background result ends with an actionable follow-up question, such as `Want me to repair the automations first?`, the integration uses `assist_satellite.start_conversation` on the configured satellite instead of a passive announce/TTS pair, so the user can answer naturally.
+5. The run continues in the background and the integration creates a Home Assistant persistent notification containing the full result when it completes, fails, needs approval, or is still running after the background polling window.
+6. If completion tablet entities are configured, ordinary short results are displayed with `assist_satellite.announce` and spoken through `tts.speak`.
+7. For long results, such as health checks or research reports, the tablet gets a short summary plus `I saved the full report in Home Assistant notifications.` The full text stays in the notification.
+8. If the background result ends with an actionable follow-up question, such as `Want me to repair the automations first?`, the integration uses `assist_satellite.start_conversation` on the configured satellite with the short summary and question, so the user can answer naturally.
 
 This is intended for requests like health checks, diagnostics, searches, and other multi-step work that take longer than a comfortable voice response window.
 
