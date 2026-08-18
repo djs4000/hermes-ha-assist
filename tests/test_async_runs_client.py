@@ -5,6 +5,15 @@ CONVERSATION = Path("custom_components/hermes_assist/conversation.py")
 CONST = Path("custom_components/hermes_assist/const.py")
 CONFIG_FLOW = Path("custom_components/hermes_assist/config_flow.py")
 STRINGS = Path("custom_components/hermes_assist/strings.json")
+ROOT_ICON = Path("icon.png")
+INTEGRATION_ICON = Path("custom_components/hermes_assist/icon.png")
+
+
+def test_hacs_icon_assets_exist():
+    assert ROOT_ICON.exists()
+    assert INTEGRATION_ICON.exists()
+    assert ROOT_ICON.stat().st_size > 0
+    assert INTEGRATION_ICON.stat().st_size > 0
 
 
 def test_client_builds_runs_url_from_chat_completions_url():

@@ -1,5 +1,7 @@
 # Hermes HA Assist
 
+![Hermes Assist icon](icon.png)
+
 A clean Home Assistant custom integration that exposes Hermes Agent as a Home Assistant Assist conversation agent using Hermes' existing HTTP API.
 
 This intentionally does **not** use a persistent WebSocket for voice requests. Home Assistant starts each spoken/text query as a Hermes HTTP run, waits briefly for a fast answer, and hands longer work off to the background instead of letting Assist fail silently.
