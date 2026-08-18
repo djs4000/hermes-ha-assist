@@ -17,10 +17,20 @@ from .const import (
     CONF_API_PORT,
     CONF_API_TOKEN,
     CONF_MODEL,
+    CONF_HANDOFF_MODEL,
+    CONF_HANDOFF_TIMEOUT,
+    CONF_COMPLETION_ANNOUNCE_ENTITY,
+    CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
+    CONF_COMPLETION_TTS_ENTITY,
     CONF_SYSTEM_PROMPT,
     CONF_TIMEOUT,
     CONF_VOICE_WAIT_TIMEOUT,
     DEFAULT_MODEL,
+    DEFAULT_HANDOFF_MODEL,
+    DEFAULT_HANDOFF_TIMEOUT,
+    DEFAULT_COMPLETION_ANNOUNCE_ENTITY,
+    DEFAULT_COMPLETION_MEDIA_PLAYER_ENTITY,
+    DEFAULT_COMPLETION_TTS_ENTITY,
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_TIMEOUT,
     DEFAULT_VOICE_WAIT_TIMEOUT,
@@ -120,6 +130,29 @@ class HermesAssistOptionsFlowHandler(config_entries.OptionsFlow):
             CONF_VOICE_WAIT_TIMEOUT,
             data.get(CONF_VOICE_WAIT_TIMEOUT, DEFAULT_VOICE_WAIT_TIMEOUT),
         )
+        handoff_model = options.get(
+            CONF_HANDOFF_MODEL,
+            data.get(CONF_HANDOFF_MODEL, DEFAULT_HANDOFF_MODEL),
+        )
+        handoff_timeout = options.get(
+            CONF_HANDOFF_TIMEOUT,
+            data.get(CONF_HANDOFF_TIMEOUT, DEFAULT_HANDOFF_TIMEOUT),
+        )
+        completion_announce_entity = options.get(
+            CONF_COMPLETION_ANNOUNCE_ENTITY,
+            data.get(CONF_COMPLETION_ANNOUNCE_ENTITY, DEFAULT_COMPLETION_ANNOUNCE_ENTITY),
+        )
+        completion_tts_entity = options.get(
+            CONF_COMPLETION_TTS_ENTITY,
+            data.get(CONF_COMPLETION_TTS_ENTITY, DEFAULT_COMPLETION_TTS_ENTITY),
+        )
+        completion_media_player_entity = options.get(
+            CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
+            data.get(
+                CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
+                DEFAULT_COMPLETION_MEDIA_PLAYER_ENTITY,
+            ),
+        )
 
         return self.async_show_form(
             step_id="init",
@@ -128,6 +161,20 @@ class HermesAssistOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(CONF_MODEL, default=model): str,
                     vol.Optional(CONF_TIMEOUT, default=timeout): vol.Coerce(int),
                     vol.Optional(CONF_VOICE_WAIT_TIMEOUT, default=voice_wait_timeout): vol.Coerce(int),
+                    vol.Optional(CONF_HANDOFF_MODEL, default=handoff_model): str,
+                    vol.Optional(CONF_HANDOFF_TIMEOUT, default=handoff_timeout): vol.Coerce(int),
+                    vol.Optional(
+                        CONF_COMPLETION_ANNOUNCE_ENTITY,
+                        default=completion_announce_entity,
+                    ): str,
+                    vol.Optional(
+                        CONF_COMPLETION_TTS_ENTITY,
+                        default=completion_tts_entity,
+                    ): str,
+                    vol.Optional(
+                        CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
+                        default=completion_media_player_entity,
+                    ): str,
                     vol.Optional(
                         CONF_SYSTEM_PROMPT,
                         default=prompt,

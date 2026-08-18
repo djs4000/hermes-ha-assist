@@ -29,11 +29,16 @@
     "step": {
       "init": {
         "title": "Hermes Assist options",
-        "description": "Tune Hermes Assist behavior. Connection URL and token remain in the original setup entry; the API model ID, timeout, voice wait timeout, and system prompt can be adjusted here.",
+        "description": "Tune Hermes Assist behavior. Connection URL and token remain in the original setup entry; the API model ID, timeout, voice wait timeout, AI handoff generation, background completion delivery, and system prompt can be adjusted here.",
         "data": {
           "model": "Hermes API model ID",
           "timeout": "Request timeout seconds",
           "voice_wait_timeout": "Voice wait timeout seconds",
+          "handoff_model": "Handoff model ID",
+          "handoff_timeout": "Handoff generation timeout seconds",
+          "completion_announce_entity": "Completion Assist satellite entity",
+          "completion_tts_entity": "Completion TTS entity",
+          "completion_media_player_entity": "Completion media player entity",
           "system_prompt": "System prompt"
         }
       }

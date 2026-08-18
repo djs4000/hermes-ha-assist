@@ -22,12 +22,23 @@ from .const import (
     CONF_API_TOKEN,
     CONF_API_URL,
     CONF_MODEL,
+    CONF_HANDOFF_MODEL,
+    CONF_HANDOFF_TIMEOUT,
+    CONF_COMPLETION_ANNOUNCE_ENTITY,
+    CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
+    CONF_COMPLETION_TTS_ENTITY,
     CONF_SYSTEM_PROMPT,
     CONF_TIMEOUT,
     CONF_VOICE_WAIT_TIMEOUT,
     DEFAULT_API_HOST,
     DEFAULT_API_PORT,
     DEFAULT_MODEL,
+    DEFAULT_HANDOFF_MODEL,
+    DEFAULT_HANDOFF_SPEECH,
+    DEFAULT_HANDOFF_TIMEOUT,
+    DEFAULT_COMPLETION_ANNOUNCE_ENTITY,
+    DEFAULT_COMPLETION_MEDIA_PLAYER_ENTITY,
+    DEFAULT_COMPLETION_TTS_ENTITY,
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_TIMEOUT,
     DEFAULT_VOICE_WAIT_TIMEOUT,
@@ -35,8 +46,9 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-_HANDOFF_SPEECH = "Let me work on that. I’ll send the result as a Home Assistant notification when it’s done."
+_HANDOFF_SPEECH = DEFAULT_HANDOFF_SPEECH
 _UNAVAILABLE_SPEECH = "I’m sorry, Hermes is not available right now."
+_TABLET_MESSAGE_MAX_CHARS = 900
 _RUN_POLL_INTERVAL = 1.0
 _RUN_BACKGROUND_TIMEOUT = 300
 
@@ -74,6 +86,31 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 data.get(CONF_VOICE_WAIT_TIMEOUT, DEFAULT_VOICE_WAIT_TIMEOUT),
             )
         )
+        self._handoff_model = entry.options.get(
+            CONF_HANDOFF_MODEL,
+            data.get(CONF_HANDOFF_MODEL, DEFAULT_HANDOFF_MODEL),
+        ).strip()
+        self._handoff_timeout = float(
+            entry.options.get(
+                CONF_HANDOFF_TIMEOUT,
+                data.get(CONF_HANDOFF_TIMEOUT, DEFAULT_HANDOFF_TIMEOUT),
+            )
+        )
+        self._completion_announce_entity = entry.options.get(
+            CONF_COMPLETION_ANNOUNCE_ENTITY,
+            data.get(CONF_COMPLETION_ANNOUNCE_ENTITY, DEFAULT_COMPLETION_ANNOUNCE_ENTITY),
+        ).strip()
+        self._completion_tts_entity = entry.options.get(
+            CONF_COMPLETION_TTS_ENTITY,
+            data.get(CONF_COMPLETION_TTS_ENTITY, DEFAULT_COMPLETION_TTS_ENTITY),
+        ).strip()
+        self._completion_media_player_entity = entry.options.get(
+            CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
+            data.get(
+                CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
+                DEFAULT_COMPLETION_MEDIA_PLAYER_ENTITY,
+            ),
+        ).strip()
         self._client = HermesAssistClient(
             async_get_clientsession(hass),
             api_url=api_url,
@@ -112,7 +149,11 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 self.hass.async_create_task(
                     self._notify_when_run_finishes(run.run_id, user_input.text)
                 )
-                speech = _HANDOFF_SPEECH
+                speech = await self._generate_handoff_speech(
+                    user_input.text,
+                    language=language,
+                    device_name=device_name,
+                )
         except HermesAssistError as exc:
             _LOGGER.warning("Hermes voice request failed: %s", exc)
             speech = _UNAVAILABLE_SPEECH
@@ -126,6 +167,32 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             response=intent_response,
             conversation_id=conversation_id,
         )
+
+    async def _generate_handoff_speech(
+        self,
+        request_text: str,
+        *,
+        language: str | None,
+        device_name: str | None,
+    ) -> str:
+        """Generate a contextual handoff phrase, falling back safely."""
+        if not self._handoff_model or self._handoff_timeout <= 0:
+            return _HANDOFF_SPEECH
+        try:
+            handoff = await self._client.async_generate_handoff(
+                request_text,
+                model=self._handoff_model,
+                timeout=self._handoff_timeout,
+                language=language,
+                device_name=device_name,
+            )
+        except HermesAssistError as exc:
+            _LOGGER.warning("Hermes handoff generation failed: %s", exc)
+            return _HANDOFF_SPEECH
+        except Exception:
+            _LOGGER.exception("Unexpected Hermes handoff generation failure")
+            return _HANDOFF_SPEECH
+        return handoff or _HANDOFF_SPEECH
 
     async def _wait_for_run(self, run_id: str, timeout: float) -> HermesRunStatus | None:
         """Poll a Hermes run until it finishes or the voice wait expires."""
@@ -149,28 +216,74 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 _LOGGER.warning("Could not poll Hermes run %s: %s", run_id, exc)
                 return
             if status.status == "completed":
-                await self._create_notification(
+                await self._deliver_background_result(
                     "Hermes finished working",
                     status.output or f"Hermes completed: {request_text}",
                 )
                 return
             if status.status == "waiting_for_approval":
-                await self._create_notification(
+                await self._deliver_background_result(
                     "Hermes needs approval",
                     f"Hermes needs approval to continue: {request_text}",
                 )
                 return
             if status.status in {"failed", "cancelled"}:
-                await self._create_notification(
+                await self._deliver_background_result(
                     "Hermes run did not complete",
                     status.output or f"Hermes run {status.status}: {request_text}",
                 )
                 return
             await asyncio.sleep(_RUN_POLL_INTERVAL)
-        await self._create_notification(
+        await self._deliver_background_result(
             "Hermes is still working",
             f"Hermes is still working on: {request_text}",
         )
+
+    async def _deliver_background_result(self, title: str, message: str) -> None:
+        """Deliver a completed background run to notification and optional tablet."""
+        await self._create_notification(title, message)
+        tablet_message = _tablet_message(title, message)
+        await self._announce_to_tablet(tablet_message)
+        await self._speak_to_tablet(tablet_message)
+
+    async def _announce_to_tablet(self, message: str) -> None:
+        if not self._completion_announce_entity:
+            return
+        try:
+            await self.hass.services.async_call(
+                "assist_satellite",
+                "announce",
+                {"message": message},
+                target={"entity_id": self._completion_announce_entity},
+                blocking=False,
+            )
+        except Exception:
+            _LOGGER.exception(
+                "Could not announce Hermes completion to %s",
+                self._completion_announce_entity,
+            )
+
+    async def _speak_to_tablet(self, message: str) -> None:
+        if not self._completion_tts_entity or not self._completion_media_player_entity:
+            return
+        try:
+            await self.hass.services.async_call(
+                "tts",
+                "speak",
+                {
+                    "media_player_entity_id": self._completion_media_player_entity,
+                    "message": message,
+                    "cache": False,
+                },
+                target={"entity_id": self._completion_tts_entity},
+                blocking=False,
+            )
+        except Exception:
+            _LOGGER.exception(
+                "Could not speak Hermes completion via %s to %s",
+                self._completion_tts_entity,
+                self._completion_media_player_entity,
+            )
 
     async def _create_notification(self, title: str, message: str) -> None:
         await self.hass.services.async_call(
@@ -194,6 +307,14 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             return device.name if device else None
         except Exception:
             return None
+
+
+def _tablet_message(title: str, message: str) -> str:
+    """Return a tablet-friendly message that is safe to display and speak."""
+    full_message = f"{title}. {message}".strip()
+    if len(full_message) <= _TABLET_MESSAGE_MAX_CHARS:
+        return full_message
+    return f"{full_message[: _TABLET_MESSAGE_MAX_CHARS - 1].rstrip()}…"
 
 
 def _entry_api_url(data: dict[str, Any]) -> str:

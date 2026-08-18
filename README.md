@@ -11,8 +11,9 @@ The previous WebSocket spike proved the concept, but request/response voice turn
 - no persistent WebSocket reconnect state
 - `/v1/runs` for Assist turns so long-running work can continue after the spoken response
 - configurable short voice wait before handoff, default `10` seconds
-- graceful spoken fallback when Hermes is still working
+- graceful AI-generated spoken fallback when Hermes is still working, with a static fallback if generation fails
 - Home Assistant notification when a background Hermes run finishes
+- optional tablet/satellite completion announcement using `assist_satellite.announce` plus `tts.speak`
 - stable conversation/session headers so Hermes can keep context
 
 ## Requirements
@@ -52,6 +53,11 @@ Restart Home Assistant, then add the integration from **Settings → Devices & s
 - **Hermes API model ID**: Usually `hermes-agent`. This is the OpenAI-compatible model identifier Hermes exposes, not necessarily the underlying LLM provider/model.
 - **Request timeout seconds**: Default `24`; this bounds individual HTTP calls to Hermes.
 - **Voice wait timeout seconds**: Default `10`; Assist waits this long for a run to finish before saying it will continue in the background.
+- **Handoff model ID**: Optional. Set this to a Hermes API model alias for a cheap/fast model; when set, it is used for a contextual spoken handoff while the main run continues. Leave blank to use the static fallback phrase.
+- **Handoff generation timeout seconds**: Default `2`; if the cheap model does not answer within this window, the static fallback phrase is used.
+- **Completion Assist satellite entity**: Optional. If set, background run results are displayed with `assist_satellite.announce`, for example `assist_satellite.living_room_kiosk_tablet`.
+- **Completion TTS entity**: Optional. TTS provider for speaking background results, for example `tts.piper`.
+- **Completion media player entity**: Optional. Media player that should speak the TTS result, for example `media_player.living_room_kiosk_tablet_media_player`.
 - **System prompt**: Optional prompt used for Home Assistant Assist responses.
 
 After setup, open the integration's **Configure** / **Options** dialog to edit:
@@ -59,6 +65,11 @@ After setup, open the integration's **Configure** / **Options** dialog to edit:
 - **Hermes API model ID**
 - **Request timeout seconds**
 - **Voice wait timeout seconds**
+- **Handoff model ID**
+- **Handoff generation timeout seconds**
+- **Completion Assist satellite entity**
+- **Completion TTS entity**
+- **Completion media player entity**
 - **System prompt**
 
 Connection-critical values — Hermes URL, API port, and API token — stay in the original setup entry.
@@ -70,8 +81,9 @@ Assist turns use Hermes `/v1/runs`:
 1. Home Assistant starts a Hermes run.
 2. The integration polls for up to **Voice wait timeout seconds**.
 3. If the run completes quickly, Assist speaks the answer.
-4. If Hermes is still working, Assist says: `Let me work on that. I’ll send the result as a Home Assistant notification when it’s done.`
+4. If Hermes is still working, Assist asks the configured handoff model for a short contextual phrase such as `Let me check on that. I’ll send the result when it’s done.` If generation fails or is too slow, the static phrase is used.
 5. The run continues in the background and the integration creates a Home Assistant persistent notification when it completes, fails, needs approval, or is still running after the background polling window.
+6. If completion tablet entities are configured, the same background result is also displayed with `assist_satellite.announce` and spoken through `tts.speak`.
 
 This is intended for requests like health checks, diagnostics, searches, and other multi-step work that take longer than a comfortable voice response window.
 

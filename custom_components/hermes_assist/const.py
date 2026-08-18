@@ -9,6 +9,11 @@ CONF_API_TOKEN = "api_token"
 CONF_MODEL = "model"
 CONF_TIMEOUT = "timeout"
 CONF_VOICE_WAIT_TIMEOUT = "voice_wait_timeout"
+CONF_HANDOFF_MODEL = "handoff_model"
+CONF_HANDOFF_TIMEOUT = "handoff_timeout"
+CONF_COMPLETION_ANNOUNCE_ENTITY = "completion_announce_entity"
+CONF_COMPLETION_TTS_ENTITY = "completion_tts_entity"
+CONF_COMPLETION_MEDIA_PLAYER_ENTITY = "completion_media_player_entity"
 CONF_SYSTEM_PROMPT = "system_prompt"
 
 DEFAULT_API_HOST = "http://127.0.0.1"
@@ -16,6 +21,12 @@ DEFAULT_API_PORT = 8642
 DEFAULT_MODEL = "hermes-agent"
 DEFAULT_TIMEOUT = 24
 DEFAULT_VOICE_WAIT_TIMEOUT = 10
+DEFAULT_HANDOFF_MODEL = ""
+DEFAULT_HANDOFF_TIMEOUT = 2
+DEFAULT_HANDOFF_SPEECH = "Let me check on that. I’ll send the result when it’s done."
+DEFAULT_COMPLETION_ANNOUNCE_ENTITY = ""
+DEFAULT_COMPLETION_TTS_ENTITY = ""
+DEFAULT_COMPLETION_MEDIA_PLAYER_ENTITY = ""
 DEFAULT_SYSTEM_PROMPT = (
     "You are Hermes, responding through Home Assistant Assist. "
     "Reply naturally and concisely for text-to-speech. "

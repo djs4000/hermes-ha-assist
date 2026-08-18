@@ -37,11 +37,50 @@ def test_voice_wait_timeout_is_configurable_with_default_10_seconds():
     assert "Voice wait timeout seconds" in strings_source
 
 
+def test_ai_handoff_generation_is_configurable_and_best_effort():
+    const_source = CONST.read_text()
+    config_source = CONFIG_FLOW.read_text()
+    strings_source = STRINGS.read_text()
+    client_source = CLIENT.read_text()
+    conversation_source = CONVERSATION.read_text()
+
+    assert 'CONF_HANDOFF_MODEL = "handoff_model"' in const_source
+    assert 'CONF_HANDOFF_TIMEOUT = "handoff_timeout"' in const_source
+    assert 'DEFAULT_HANDOFF_MODEL = ""' in const_source
+    assert "Handoff model ID" in strings_source
+    assert "CONF_HANDOFF_MODEL" in config_source
+    assert "async_generate_handoff" in client_source
+    assert '"model_options": {"fast": True}' in client_source
+    assert "normalize_handoff_speech" in client_source
+    assert "_generate_handoff_speech" in conversation_source
+    assert "Hermes handoff generation failed" in conversation_source
+
+
+def test_completion_tablet_delivery_is_configurable():
+    const_source = CONST.read_text()
+    config_source = CONFIG_FLOW.read_text()
+    strings_source = STRINGS.read_text()
+    conversation_source = CONVERSATION.read_text()
+
+    assert 'CONF_COMPLETION_ANNOUNCE_ENTITY = "completion_announce_entity"' in const_source
+    assert 'CONF_COMPLETION_TTS_ENTITY = "completion_tts_entity"' in const_source
+    assert 'CONF_COMPLETION_MEDIA_PLAYER_ENTITY = "completion_media_player_entity"' in const_source
+    assert "CONF_COMPLETION_ANNOUNCE_ENTITY" in config_source
+    assert "Completion Assist satellite entity" in strings_source
+    assert '"assist_satellite"' in conversation_source
+    assert '"announce"' in conversation_source
+    assert '"tts"' in conversation_source
+    assert '"speak"' in conversation_source
+    assert "media_player_entity_id" in conversation_source
+
+
 def test_conversation_uses_runs_with_handoff_and_background_completion():
     source = CONVERSATION.read_text()
+
+    const_source = CONST.read_text()
 
     assert "async_start_run" in source
     assert "async_get_run" in source
     assert "async_create_task" in source
-    assert "Let me work on that" in source
+    assert "Let me check on that" in const_source
     assert "persistent_notification" in source

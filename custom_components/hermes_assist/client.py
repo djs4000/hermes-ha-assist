@@ -8,6 +8,13 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
+_HANDOFF_SYSTEM_PROMPT = (
+    "You write one short spoken handoff phrase for a voice assistant. "
+    "The assistant has already started the user's request but it needs more time. "
+    "Return only the phrase. Make it natural for the request. "
+    "Do not mention Home Assistant notifications unless the user asked about notifications. "
+    "Keep it under 18 words."
+)
 
 
 class HermesAssistError(Exception):
@@ -148,6 +155,41 @@ class HermesAssistClient:
             raise HermesAssistError("Hermes returned an empty response")
         return HermesAssistResponse(speech=speech, raw=data)
 
+    async def async_generate_handoff(
+        self,
+        text: str,
+        *,
+        model: str,
+        timeout: float,
+        language: str | None,
+        device_name: str | None = None,
+    ) -> str:
+        """Generate a short, contextual spoken handoff phrase."""
+        model = (model or "").strip()
+        if not model:
+            return ""
+        user_message = _format_handoff_user_message(
+            text,
+            language=language,
+            device_name=device_name,
+        )
+        payload: dict[str, Any] = {
+            "model": model,
+            "stream": False,
+            "model_options": {"fast": True},
+            "messages": [
+                {"role": "system", "content": _HANDOFF_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message},
+            ],
+        }
+        data = await self._post_json(
+            self.api_url,
+            headers=self._headers(None),
+            payload=payload,
+            timeout=timeout,
+        )
+        return normalize_handoff_speech(extract_speech(data))
+
     async def async_start_run(
         self,
         text: str,
@@ -187,13 +229,14 @@ class HermesAssistClient:
         *,
         headers: dict[str, str],
         payload: dict[str, Any],
+        timeout: float | None = None,
     ) -> dict[str, Any]:
         try:
             async with self._session.post(
                 url,
                 headers=headers,
                 json=payload,
-                timeout=self._timeout,
+                timeout=aiohttp.ClientTimeout(total=float(timeout)) if timeout is not None else self._timeout,
             ) as response:
                 return await _json_or_error(response)
         except TimeoutError as exc:
@@ -259,6 +302,31 @@ def extract_speech(data: dict[str, Any]) -> str:
     except Exception:
         _LOGGER.debug("Failed to extract Hermes speech", exc_info=True)
     return ""
+
+
+def normalize_handoff_speech(text: str) -> str:
+    """Normalize model-generated handoff speech for TTS."""
+    speech = " ".join((text or "").strip().strip('"“”\'').split())
+    if not speech:
+        return ""
+    if len(speech) > 160:
+        speech = f"{speech[:159].rstrip()}…"
+    return speech
+
+
+def _format_handoff_user_message(
+    text: str,
+    *,
+    language: str | None,
+    device_name: str | None,
+) -> str:
+    lines = ["Generate a handoff phrase for this in-progress voice request."]
+    if language:
+        lines.append(f"Language: {language}")
+    if device_name:
+        lines.append(f"Device: {device_name}")
+    lines.append(f"User request: {text}")
+    return "\n".join(lines)
 
 
 def _format_user_message(text: str, *, language: str | None, device_name: str | None) -> str:

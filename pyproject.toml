@@ -1,6 +1,6 @@
 [project]
 name = "hermes-ha-assist"
-version = "0.2.0"
+version = "0.2.1"
 description = "Home Assistant Assist conversation integration for Hermes Agent"
 readme = "README.md"
 requires-python = ">=3.11"
