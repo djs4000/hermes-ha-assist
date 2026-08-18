@@ -142,21 +142,24 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 language=language,
                 device_name=device_name,
             )
+            handoff_task = self._start_handoff_task(
+                user_input.text,
+                language=language,
+                device_name=device_name,
+            )
             status = await self._wait_for_run(run.run_id, self._voice_wait_timeout)
             if status and status.status == "completed" and status.output:
+                _cancel_task(handoff_task)
                 speech = status.output
             elif status and status.status == "failed":
+                _cancel_task(handoff_task)
                 _LOGGER.warning("Hermes run failed before voice handoff: %s", status.output)
                 speech = _UNAVAILABLE_SPEECH
             else:
                 self.hass.async_create_task(
                     self._notify_when_run_finishes(run.run_id, user_input.text)
                 )
-                speech = await self._generate_handoff_speech(
-                    user_input.text,
-                    language=language,
-                    device_name=device_name,
-                )
+                speech = await self._resolve_handoff_speech(handoff_task)
         except HermesAssistError as exc:
             _LOGGER.warning("Hermes voice request failed: %s", exc)
             speech = _UNAVAILABLE_SPEECH
@@ -170,6 +173,36 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             response=intent_response,
             conversation_id=conversation_id,
         )
+
+    def _start_handoff_task(
+        self,
+        request_text: str,
+        *,
+        language: str | None,
+        device_name: str | None,
+    ) -> asyncio.Task[str] | None:
+        """Start handoff generation in parallel with the main Hermes run."""
+        if not self._handoff_model or self._handoff_timeout <= 0:
+            return None
+        return self.hass.async_create_task(
+            self._generate_handoff_speech(
+                request_text,
+                language=language,
+                device_name=device_name,
+            )
+        )
+
+    async def _resolve_handoff_speech(self, task: asyncio.Task[str] | None) -> str:
+        """Return a ready contextual handoff without adding voice latency."""
+        if task is None:
+            return _HANDOFF_SPEECH
+        if not task.done():
+            return _HANDOFF_SPEECH
+        try:
+            return task.result() or _HANDOFF_SPEECH
+        except Exception:
+            _LOGGER.exception("Unexpected Hermes handoff task failure")
+            return _HANDOFF_SPEECH
 
     async def _generate_handoff_speech(
         self,
@@ -332,6 +365,12 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             return device.name if device else None
         except Exception:
             return None
+
+
+def _cancel_task(task: asyncio.Task[Any] | None) -> None:
+    """Cancel a best-effort background task and suppress expected cancellation noise."""
+    if task is not None and not task.done():
+        task.cancel()
 
 
 def _background_tablet_message(title: str, message: str) -> str:

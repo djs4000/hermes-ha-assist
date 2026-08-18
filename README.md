@@ -11,7 +11,7 @@ The previous WebSocket spike proved the concept, but request/response voice turn
 - no persistent WebSocket reconnect state
 - `/v1/runs` for Assist turns so long-running work can continue after the spoken response
 - configurable short voice wait before handoff, default `10` seconds
-- graceful AI-generated spoken fallback when Hermes is still working, with a static fallback if generation fails
+- graceful AI-generated spoken fallback when Hermes is still working, generated in parallel with the main run and with a static fallback if generation fails
 - short tablet/TTS summaries for long background results, with the full report saved in a durable notification
 - optional tablet/satellite completion announcement using `assist_satellite.announce` plus `tts.speak`
 - automatic `assist_satellite.start_conversation` for background results that end with an actionable follow-up question
@@ -54,8 +54,8 @@ Restart Home Assistant, then add the integration from **Settings → Devices & s
 - **Hermes API model ID**: Usually `hermes-agent`. This is the OpenAI-compatible model identifier Hermes exposes, not necessarily the underlying LLM provider/model.
 - **Request timeout seconds**: Default `24`; this bounds individual HTTP calls to Hermes.
 - **Voice wait timeout seconds**: Default `10`; Assist waits this long for a run to finish before saying it will continue in the background.
-- **Handoff model ID**: Optional. Set this to a Hermes API model alias for a cheap/fast model; when set, it is used for a contextual spoken handoff while the main run continues. Leave blank to use the static fallback phrase.
-- **Handoff generation timeout seconds**: Default `2`; if the cheap model does not answer within this window, the static fallback phrase is used.
+- **Handoff model ID**: Optional. Defaults to `openai-codex:gpt-5.4-mini` for OAuth-backed lightweight handoff generation. You can also set a Hermes API model alias or another provider-prefixed value such as `openai-codex:gpt-5.3-codex-spark`; leave blank to use the static fallback phrase.
+- **Handoff generation timeout seconds**: Default `10`; generation starts in parallel with the main run, so this does not add extra voice latency when the run reaches the voice wait timeout.
 - **Completion Assist satellite entity**: Optional. If set, background run results are displayed with `assist_satellite.announce`, for example `assist_satellite.living_room_kiosk_tablet`.
 - **Completion TTS entity**: Optional. TTS provider for speaking background results, for example `tts.piper`.
 - **Completion media player entity**: Optional. Media player that should speak the TTS result, for example `media_player.living_room_kiosk_tablet_media_player`.
@@ -82,7 +82,7 @@ Assist turns use Hermes `/v1/runs`:
 1. Home Assistant starts a Hermes run.
 2. The integration polls for up to **Voice wait timeout seconds**.
 3. If the run completes quickly, Assist speaks the answer.
-4. If Hermes is still working, Assist asks the configured handoff model for a short contextual phrase such as `Let me check on that. I’ll send the result when it’s done.` If generation fails or is too slow, the static phrase is used.
+4. As soon as the run starts, the integration also starts the configured handoff model in parallel. If Hermes is still working after the voice wait, Assist uses the contextual handoff if it is already ready, otherwise it immediately uses the static phrase.
 5. The run continues in the background and the integration creates a Home Assistant persistent notification containing the full result when it completes, fails, needs approval, or is still running after the background polling window.
 6. If completion tablet entities are configured, ordinary short results are displayed with `assist_satellite.announce` and spoken through `tts.speak`.
 7. For long results, such as health checks or research reports, the tablet gets a short summary plus `I saved the full report in Home Assistant notifications.` The full text stays in the notification.

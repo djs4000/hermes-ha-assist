@@ -46,11 +46,15 @@ def test_ai_handoff_generation_is_configurable_and_best_effort():
 
     assert 'CONF_HANDOFF_MODEL = "handoff_model"' in const_source
     assert 'CONF_HANDOFF_TIMEOUT = "handoff_timeout"' in const_source
-    assert 'DEFAULT_HANDOFF_MODEL = ""' in const_source
+    assert 'DEFAULT_HANDOFF_MODEL = "openai-codex:gpt-5.4-mini"' in const_source
+    assert "parse_provider_prefixed_model" in client_source
+    assert 'payload["provider"] = handoff_model.provider' in client_source
     assert "Handoff model ID" in strings_source
     assert "CONF_HANDOFF_MODEL" in config_source
     assert "async_generate_handoff" in client_source
-    assert '"model_options": {"fast": True}' in client_source
+    assert '"model_options": {"fast": True, "reasoning": {"enabled": False}}' in client_source
+    assert "_start_handoff_task" in conversation_source
+    assert "_resolve_handoff_speech" in conversation_source
     assert "normalize_handoff_speech" in client_source
     assert "_generate_handoff_speech" in conversation_source
     assert "Hermes handoff generation failed" in conversation_source

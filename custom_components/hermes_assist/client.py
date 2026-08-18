@@ -30,6 +30,12 @@ class HermesTimeoutError(HermesAssistError):
 
 
 @dataclass(frozen=True)
+class HandoffModel:
+    provider: str
+    model: str
+
+
+@dataclass(frozen=True)
 class HermesAssistResponse:
     speech: str
     raw: dict[str, Any]
@@ -173,15 +179,18 @@ class HermesAssistClient:
             language=language,
             device_name=device_name,
         )
+        handoff_model = parse_provider_prefixed_model(model)
         payload: dict[str, Any] = {
-            "model": model,
+            "model": handoff_model.model,
             "stream": False,
-            "model_options": {"fast": True},
+            "model_options": {"fast": True, "reasoning": {"enabled": False}},
             "messages": [
                 {"role": "system", "content": _HANDOFF_SYSTEM_PROMPT},
                 {"role": "user", "content": user_message},
             ],
         }
+        if handoff_model.provider:
+            payload["provider"] = handoff_model.provider
         data = await self._post_json(
             self.api_url,
             headers=self._headers(None),
@@ -278,6 +287,19 @@ async def _json_or_error(response: aiohttp.ClientResponse) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise HermesAssistError("Hermes API returned unexpected JSON")
     return data
+
+
+def parse_provider_prefixed_model(model: str) -> HandoffModel:
+    """Parse provider-prefixed model IDs like openai-codex:gpt-5.4-mini."""
+    raw = (model or "").strip()
+    if ":" not in raw:
+        return HandoffModel(provider="", model=raw)
+    provider, model_id = raw.split(":", 1)
+    provider = provider.strip()
+    model_id = model_id.strip()
+    if not provider or not model_id:
+        return HandoffModel(provider="", model=raw)
+    return HandoffModel(provider=provider, model=model_id)
 
 
 def extract_speech(data: dict[str, Any]) -> str:
