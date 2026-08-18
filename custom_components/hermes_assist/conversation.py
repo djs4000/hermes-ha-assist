@@ -27,6 +27,8 @@ from .const import (
     CONF_COMPLETION_ANNOUNCE_ENTITY,
     CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
     CONF_COMPLETION_TTS_ENTITY,
+    CONF_COMPLETION_TTS_LANGUAGE,
+    CONF_COMPLETION_TTS_VOICE,
     CONF_SYSTEM_PROMPT,
     CONF_TIMEOUT,
     CONF_VOICE_WAIT_TIMEOUT,
@@ -39,6 +41,8 @@ from .const import (
     DEFAULT_COMPLETION_ANNOUNCE_ENTITY,
     DEFAULT_COMPLETION_MEDIA_PLAYER_ENTITY,
     DEFAULT_COMPLETION_TTS_ENTITY,
+    DEFAULT_COMPLETION_TTS_LANGUAGE,
+    DEFAULT_COMPLETION_TTS_VOICE,
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_TIMEOUT,
     DEFAULT_VOICE_WAIT_TIMEOUT,
@@ -113,6 +117,14 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
                 DEFAULT_COMPLETION_MEDIA_PLAYER_ENTITY,
             ),
+        ).strip()
+        self._completion_tts_language = entry.options.get(
+            CONF_COMPLETION_TTS_LANGUAGE,
+            data.get(CONF_COMPLETION_TTS_LANGUAGE, DEFAULT_COMPLETION_TTS_LANGUAGE),
+        ).strip()
+        self._completion_tts_voice = entry.options.get(
+            CONF_COMPLETION_TTS_VOICE,
+            data.get(CONF_COMPLETION_TTS_VOICE, DEFAULT_COMPLETION_TTS_VOICE),
         ).strip()
         self._client = HermesAssistClient(
             async_get_clientsession(hass),
@@ -326,14 +338,19 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
         if not self._completion_tts_entity or not self._completion_media_player_entity:
             return
         try:
+            service_data = {
+                "media_player_entity_id": self._completion_media_player_entity,
+                "message": message,
+                "cache": False,
+            }
+            if self._completion_tts_language:
+                service_data["language"] = self._completion_tts_language
+            if self._completion_tts_voice:
+                service_data["options"] = {"voice": self._completion_tts_voice}
             await self.hass.services.async_call(
                 "tts",
                 "speak",
-                {
-                    "media_player_entity_id": self._completion_media_player_entity,
-                    "message": message,
-                    "cache": False,
-                },
+                service_data,
                 target={"entity_id": self._completion_tts_entity},
                 blocking=False,
             )

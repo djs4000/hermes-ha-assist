@@ -22,6 +22,8 @@ from .const import (
     CONF_COMPLETION_ANNOUNCE_ENTITY,
     CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
     CONF_COMPLETION_TTS_ENTITY,
+    CONF_COMPLETION_TTS_LANGUAGE,
+    CONF_COMPLETION_TTS_VOICE,
     CONF_SYSTEM_PROMPT,
     CONF_TIMEOUT,
     CONF_VOICE_WAIT_TIMEOUT,
@@ -31,6 +33,8 @@ from .const import (
     DEFAULT_COMPLETION_ANNOUNCE_ENTITY,
     DEFAULT_COMPLETION_MEDIA_PLAYER_ENTITY,
     DEFAULT_COMPLETION_TTS_ENTITY,
+    DEFAULT_COMPLETION_TTS_LANGUAGE,
+    DEFAULT_COMPLETION_TTS_VOICE,
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_TIMEOUT,
     DEFAULT_VOICE_WAIT_TIMEOUT,
@@ -153,6 +157,14 @@ class HermesAssistOptionsFlowHandler(config_entries.OptionsFlow):
                 DEFAULT_COMPLETION_MEDIA_PLAYER_ENTITY,
             ),
         )
+        completion_tts_language = options.get(
+            CONF_COMPLETION_TTS_LANGUAGE,
+            data.get(CONF_COMPLETION_TTS_LANGUAGE, DEFAULT_COMPLETION_TTS_LANGUAGE),
+        )
+        completion_tts_voice = options.get(
+            CONF_COMPLETION_TTS_VOICE,
+            data.get(CONF_COMPLETION_TTS_VOICE, DEFAULT_COMPLETION_TTS_VOICE),
+        )
 
         return self.async_show_form(
             step_id="init",
@@ -174,6 +186,14 @@ class HermesAssistOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_COMPLETION_MEDIA_PLAYER_ENTITY,
                         default=completion_media_player_entity,
+                    ): str,
+                    vol.Optional(
+                        CONF_COMPLETION_TTS_LANGUAGE,
+                        default=completion_tts_language,
+                    ): str,
+                    vol.Optional(
+                        CONF_COMPLETION_TTS_VOICE,
+                        default=completion_tts_voice,
                     ): str,
                     vol.Optional(
                         CONF_SYSTEM_PROMPT,

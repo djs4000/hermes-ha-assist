@@ -59,6 +59,8 @@ Restart Home Assistant, then add the integration from **Settings → Devices & s
 - **Completion Assist satellite entity**: Optional. If set, background run results are displayed with `assist_satellite.announce`, for example `assist_satellite.living_room_kiosk_tablet`.
 - **Completion TTS entity**: Optional. TTS provider for speaking background results, for example `tts.piper`.
 - **Completion media player entity**: Optional. Media player that should speak the TTS result, for example `media_player.living_room_kiosk_tablet_media_player`.
+- **Completion TTS language**: Defaults to `en_GB` for Piper background speech.
+- **Completion TTS voice**: Defaults to `en_GB-jenny_dioco-medium` / Jenny Dioco medium.
 - **System prompt**: Optional prompt used for Home Assistant Assist responses.
 
 After setup, open the integration's **Configure** / **Options** dialog to edit:
@@ -71,6 +73,8 @@ After setup, open the integration's **Configure** / **Options** dialog to edit:
 - **Completion Assist satellite entity**
 - **Completion TTS entity**
 - **Completion media player entity**
+- **Completion TTS language**
+- **Completion TTS voice**
 - **System prompt**
 
 Connection-critical values — Hermes URL, API port, and API token — stay in the original setup entry.

@@ -39,6 +39,8 @@
           "completion_announce_entity": "Completion Assist satellite entity",
           "completion_tts_entity": "Completion TTS entity",
           "completion_media_player_entity": "Completion media player entity",
+          "completion_tts_language": "Completion TTS language",
+          "completion_tts_voice": "Completion TTS voice",
           "system_prompt": "System prompt"
         }
       }

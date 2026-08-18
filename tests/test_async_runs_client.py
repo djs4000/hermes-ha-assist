@@ -69,8 +69,15 @@ def test_completion_tablet_delivery_is_configurable():
     assert 'CONF_COMPLETION_ANNOUNCE_ENTITY = "completion_announce_entity"' in const_source
     assert 'CONF_COMPLETION_TTS_ENTITY = "completion_tts_entity"' in const_source
     assert 'CONF_COMPLETION_MEDIA_PLAYER_ENTITY = "completion_media_player_entity"' in const_source
-    assert "CONF_COMPLETION_ANNOUNCE_ENTITY" in config_source
+    assert 'CONF_COMPLETION_TTS_LANGUAGE = "completion_tts_language"' in const_source
+    assert 'CONF_COMPLETION_TTS_VOICE = "completion_tts_voice"' in const_source
+    assert 'DEFAULT_COMPLETION_TTS_LANGUAGE = "en_GB"' in const_source
+    assert 'DEFAULT_COMPLETION_TTS_VOICE = "en_GB-jenny_dioco-medium"' in const_source
+    assert "CONF_COMPLETION_TTS_LANGUAGE" in config_source
+    assert "CONF_COMPLETION_TTS_VOICE" in config_source
     assert "Completion Assist satellite entity" in strings_source
+    assert "Completion TTS language" in strings_source
+    assert "Completion TTS voice" in strings_source
     assert '"assist_satellite"' in conversation_source
     assert '"announce"' in conversation_source
     assert '"start_conversation"' in conversation_source
@@ -81,6 +88,8 @@ def test_completion_tablet_delivery_is_configurable():
     assert '"tts"' in conversation_source
     assert '"speak"' in conversation_source
     assert "media_player_entity_id" in conversation_source
+    assert 'service_data["language"] = self._completion_tts_language' in conversation_source
+    assert 'service_data["options"] = {"voice": self._completion_tts_voice}' in conversation_source
 
 
 def test_conversation_uses_runs_with_handoff_and_background_completion():
