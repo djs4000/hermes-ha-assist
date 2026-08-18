@@ -26,8 +26,8 @@ def test_form_defaults_preserve_non_secret_values_after_validation_error():
     assert defaults["api_url"] == "http://192.168.1.148:8642"
     assert defaults["model"] == "hermes-agent"
     assert defaults["timeout"] == 18
-    assert defaults["system_prompt"] == "A long custom prompt\nwith multiple lines."
     assert "api_token" not in defaults
+    assert "system_prompt" not in defaults
 
 
 def test_form_defaults_use_initial_values_without_user_input():
@@ -38,3 +38,4 @@ def test_form_defaults_use_initial_values_without_user_input():
     assert defaults["model"] == "hermes-agent"
     assert defaults["timeout"] == 24
     assert "api_token" not in defaults
+    assert "system_prompt" not in defaults

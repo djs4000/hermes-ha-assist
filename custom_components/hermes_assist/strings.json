@@ -10,8 +10,7 @@
           "api_url": "Hermes API URL",
           "api_token": "Hermes API token",
           "model": "Model",
-          "timeout": "Request timeout seconds",
-          "system_prompt": "System prompt"
+          "timeout": "Request timeout seconds"
         }
       }
     },
@@ -21,6 +20,17 @@
     },
     "abort": {
       "already_configured": "Hermes Assist is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Hermes Assist options",
+        "description": "Configure optional Hermes Assist behavior.",
+        "data": {
+          "system_prompt": "System prompt"
+        }
+      }
     }
   }
 }

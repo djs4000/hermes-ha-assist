@@ -46,6 +46,8 @@ Restart Home Assistant, then add the integration from **Settings → Devices & s
 - **Model**: usually `hermes-agent`.
 - **Request timeout**: default 24 seconds, below Home Assistant's typical 30s Assist timeout.
 
+After setup, open the integration's **Configure** / **Options** dialog to edit the optional **System prompt**. It is kept out of the initial connection form so connection errors do not make a large prompt field awkward to manage.
+
 ## Development
 
 ```bash

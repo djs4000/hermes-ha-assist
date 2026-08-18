@@ -13,5 +13,5 @@
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/djs4000/hermes-ha-assist/issues",
   "requirements": [],
-  "version": "0.1.1"
+  "version": "0.1.2"
 }

@@ -33,6 +33,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     agent = HermesConversationAgent(hass, entry)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = agent
     conversation.async_set_agent(hass, entry, agent)
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+
+
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload Hermes Assist when options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -54,7 +60,7 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             api_token=data[CONF_API_TOKEN],
             model=data.get(CONF_MODEL, DEFAULT_MODEL),
             timeout=data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT),
-            system_prompt=data.get(CONF_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT),
+            system_prompt=entry.options.get(CONF_SYSTEM_PROMPT, data.get(CONF_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT)),
         )
 
     @property

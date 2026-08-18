@@ -18,6 +18,7 @@ from .const import (
     CONF_MODEL,
     CONF_SYSTEM_PROMPT,
     CONF_TIMEOUT,
+    DEFAULT_SYSTEM_PROMPT,
     DOMAIN,
 )
 
@@ -42,7 +43,7 @@ class HermesAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     api_token=user_input[CONF_API_TOKEN],
                     model=user_input[CONF_MODEL],
                     timeout=user_input[CONF_TIMEOUT],
-                    system_prompt=user_input[CONF_SYSTEM_PROMPT],
+                    system_prompt=DEFAULT_SYSTEM_PROMPT,
                 )
                 await client.async_validate()
             except HermesAssistError as exc:
@@ -72,11 +73,41 @@ class HermesAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                     vol.Optional(CONF_MODEL, default=defaults[CONF_MODEL]): str,
                     vol.Optional(CONF_TIMEOUT, default=defaults[CONF_TIMEOUT]): vol.Coerce(int),
-                    vol.Optional(
-                        CONF_SYSTEM_PROMPT,
-                        default=defaults[CONF_SYSTEM_PROMPT],
-                    ): selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
                 }
             ),
             errors=errors,
+        )
+
+
+    @staticmethod
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry):
+        """Return the options flow for Hermes Assist."""
+        return HermesAssistOptionsFlowHandler(config_entry)
+
+
+class HermesAssistOptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle Hermes Assist options."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None):
+        """Manage Hermes Assist options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        prompt = self.config_entry.options.get(
+            CONF_SYSTEM_PROMPT,
+            self.config_entry.data.get(CONF_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT),
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_SYSTEM_PROMPT,
+                        default=prompt,
+                    ): selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
+                }
+            ),
         )
