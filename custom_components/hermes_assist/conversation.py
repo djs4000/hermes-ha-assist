@@ -440,7 +440,8 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 device_id=device_id,
             )
             return
-        await self._announce_to_tablet(tablet_message)
+        if await self._announce_to_tablet(tablet_message):
+            return
         await self._speak_to_tablet(tablet_message)
 
     async def _start_followup_conversation_if_needed(self, message: str) -> bool:
@@ -463,9 +464,9 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
             )
             return False
 
-    async def _announce_to_tablet(self, message: str) -> None:
+    async def _announce_to_tablet(self, message: str) -> bool:
         if not self._completion_announce_entity:
-            return
+            return False
         try:
             await self.hass.services.async_call(
                 "assist_satellite",
@@ -474,11 +475,13 @@ class HermesConversationAgent(conversation.AbstractConversationAgent):
                 target={"entity_id": self._completion_announce_entity},
                 blocking=False,
             )
+            return True
         except Exception:
             _LOGGER.exception(
                 "Could not announce Hermes completion to %s",
                 self._completion_announce_entity,
             )
+            return False
 
     async def _speak_to_tablet(self, message: str) -> None:
         if not self._completion_tts_entity or not self._completion_media_player_entity:
